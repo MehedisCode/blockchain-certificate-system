@@ -35,7 +35,6 @@ function App() {
       const link = 'https://mbi.edu';
       const courses = [['Blockchain Basics']];
 
-      // Call the addInstitute function from contract
       const tx = await institution.addInstitute(
         userAddress,
         name,
@@ -44,7 +43,9 @@ function App() {
         courses
       );
 
-      await tx.wait(); // wait for transaction to be mined
+      console.log('Submitted tx:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('Mined in block:', receipt.blockNumber);
 
       alert('Institute added successfully!');
     } catch (error) {
@@ -88,7 +89,7 @@ function App() {
         </h2>
 
         {account ? (
-          <p className="mb-4">Connected as: {account}</p>
+          <p className="mb-4 text-black">Connected as: {account}</p>
         ) : (
           <button
             onClick={connectWallet}
@@ -115,7 +116,7 @@ function App() {
         </div>
 
         {institute && (
-          <div className="mt-6 text-left">
+          <div className="mt-6 text-left text-black">
             <p>
               <strong>Name:</strong> {institute[0]}
             </p>

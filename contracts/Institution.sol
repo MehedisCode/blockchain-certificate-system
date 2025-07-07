@@ -10,6 +10,7 @@ contract Institution {
     // Mappings
     mapping(address => Institute) private institutes; // Institutes Mapping
     mapping(address => Course[]) private instituteCourses; // Courses Mapping
+    address[] public instituteAddresses;
 
     // Events
     event instituteAdded(string _instituteName);
@@ -74,6 +75,8 @@ contract Institution {
         for (uint256 i = 0; i < _institute_courses.length; i++) {
             instituteCourses[_address].push(_institute_courses[i]);
         }
+        
+        instituteAddresses.push(_address); // for testing
         emit instituteAdded(_institute_name);
         return true;
     }
@@ -141,5 +144,9 @@ contract Institution {
         } else {
             return false;
         }
+    }
+    
+    function getInstituteCount() public view returns (uint256) {
+        return instituteAddresses.length;
     }
 }
