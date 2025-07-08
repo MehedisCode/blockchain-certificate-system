@@ -143,4 +143,9 @@ contract Institution {
             return false;
         }
     }
+
+    function updateInstituteName(string memory _newName) public {
+        require(bytes(institutes[msg.sender].institute_name).length > 0, "Institute not found");
+        institutes[msg.sender].institute_name = _newName;
+    }
 }

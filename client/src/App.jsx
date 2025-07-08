@@ -81,6 +81,27 @@ function App() {
     }
   };
 
+  const updateInstituteName = async newName => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(
+        institutionAddress,
+        InstitutionAbi.abi,
+        signer
+      );
+      console.log(newName);
+
+      const tx = await contract.updateInstituteName(newName);
+      await tx.wait();
+
+      alert('Institute name updated!');
+    } catch (err) {
+      console.error('Error updating name:', err);
+      alert('Update failed.');
+    }
+  };
+
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-gray-100">
       <div className="w-full max-w-xl rounded bg-white p-8 text-center shadow">
@@ -112,6 +133,15 @@ function App() {
             className="rounded bg-indigo-500 px-4 py-2 text-white hover:bg-indigo-600"
           >
             Get Institute Data
+          </button>{' '}
+          <br />
+          <button
+            onClick={() =>
+              updateInstituteName('Updated Blockchain Institute 2')
+            }
+            className="rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600"
+          >
+            Update Name
           </button>
         </div>
 
