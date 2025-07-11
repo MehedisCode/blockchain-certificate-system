@@ -9,13 +9,23 @@ import './App.css';
 
 // Nav
 import NavBarLanding from './Components/NavBarLanding';
+import GenerateCert from './Components/GenerateCert';
 
 // Pages
 import Home from './Components/Home';
+import NavBarInstitute from './Components/NavbarInstitute';
 
 // Layout Wrapper
 const DynamicLayoutRoute = ({ layout, children }) => {
   switch (layout) {
+    case 'INSTITUTE': {
+      return (
+        <>
+          <NavBarInstitute />
+          {children}
+        </>
+      );
+    }
     default:
       return (
         <>
@@ -39,6 +49,15 @@ const App = () => {
               </DynamicLayoutRoute>
             }
           />
+          <Route
+            path="/institute"
+            element={
+              <DynamicLayoutRoute layout="INSTITUTE">
+                <GenerateCert />
+              </DynamicLayoutRoute>
+            }
+          />
+
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
