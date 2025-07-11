@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Typography,
   AppBar,
@@ -18,6 +18,10 @@ import {
 import FileCopyIcon from '@mui/icons-material/FileCopyOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNewOutlined';
 import LoopIcon from '@mui/icons-material/LoopOutlined';
+import { ethers } from 'ethers';
+import InstitutionAbi from '../contracts/Institution.json';
+
+const institutionAddress = import.meta.env.VITE_INSTITUTION_ADDRESS;
 
 const InstitutePage = () => {
   const [tabValue, setTabValue] = useState(0);
@@ -29,7 +33,43 @@ const InstitutePage = () => {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [revokeSuccess, setRevokeSuccess] = useState(false);
 
+  // Institute data from blockchain
+  const [instituteName, setInstituteName] = useState('');
+  const [instituteAcronym, setInstituteAcronym] = useState('');
+  const [instituteWebsite, setInstituteWebsite] = useState('');
+  const [instituteCourses, setInstituteCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Methods
   const handleTabChange = (_, newValue) => setTabValue(newValue);
+  const fetchInstituteData = async () => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      const institution = new ethers.Contract(
+        institutionAddress,
+        InstitutionAbi.abi,
+        signer
+      );
+
+      const [name, acronym, website, courses] =
+        await institution.getInstituteData();
+
+      setInstituteName(name);
+      setInstituteAcronym(acronym);
+      setInstituteWebsite(website);
+      setInstituteCourses(courses.map(c => ({ course_name: c.course_name })));
+    } catch (err) {
+      console.error('Error loading institute data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInstituteData();
+  }, []);
 
   const dummyCourses = [
     { course_name: 'Blockchain Basics' },
@@ -76,7 +116,7 @@ const InstitutePage = () => {
               </Tabs>
             </AppBar>
           </Paper>
-
+          {/* Generate Certificate Forum */}
           {tabValue === 0 && (
             <Box sx={{ mt: 3 }}>
               <Typography variant="subtitle1" gutterBottom>
@@ -86,21 +126,21 @@ const InstitutePage = () => {
               <TextField
                 fullWidth
                 label="Institute Name"
-                value="My Blockchain Institute"
+                value={instituteName}
                 margin="normal"
                 InputProps={{ readOnly: true }}
               />
               <TextField
                 fullWidth
                 label="Institute Acronym"
-                value="MBI"
+                value={instituteAcronym}
                 margin="normal"
                 InputProps={{ readOnly: true }}
               />
               <TextField
                 fullWidth
                 label="Institute Website"
-                value="https://mbi.org"
+                value={instituteWebsite}
                 margin="normal"
                 InputProps={{ readOnly: true }}
               />
@@ -125,7 +165,7 @@ const InstitutePage = () => {
                   label="Course"
                   onChange={e => setCourseIndex(e.target.value)}
                 >
-                  {dummyCourses.map((course, index) => (
+                  {instituteCourses.map((course, index) => (
                     <MenuItem value={index} key={index}>
                       {course.course_name}
                     </MenuItem>
@@ -189,7 +229,6 @@ const InstitutePage = () => {
               )}
             </Box>
           )}
-
           {tabValue === 1 && (
             <Box sx={{ mt: 3 }}>
               <Typography variant="subtitle1" gutterBottom>
