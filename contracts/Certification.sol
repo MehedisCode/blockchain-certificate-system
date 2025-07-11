@@ -41,7 +41,7 @@ contract Certification {
             return 0x0;
         }
         assembly {
-                result := mload(add(source, 32))
+            result := mload(add(source, 32))
         }
     }
 

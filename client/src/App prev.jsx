@@ -30,7 +30,7 @@ function App() {
       );
 
       // institute data
-      const name = 'My Blockchain Institute';
+      const name = 'My Blockchain Institute 3';
       const acronym = 'MBI';
       const link = 'https://mbi.edu';
       const courses = [['Blockchain Basics']];

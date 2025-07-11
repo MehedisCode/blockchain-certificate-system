@@ -28,7 +28,7 @@ const Home = () => {
         alignItems: 'center',
       }}
     >
-      <Grid item xs={12} md={8}>
+      <Grid>
         <Typography variant="h2" sx={{ fontWeight: 900, mb: 3 }}>
           Blockchain Certificate System
         </Typography>

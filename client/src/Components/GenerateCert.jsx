@@ -20,8 +20,12 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNewOutlined';
 import LoopIcon from '@mui/icons-material/LoopOutlined';
 import { ethers } from 'ethers';
 import InstitutionAbi from '../contracts/Institution.json';
+import CertificationAbi from '../contracts/Certification.json';
+import { v4 as uuidv4 } from 'uuid';
+import { encrypt } from './encrypt';
 
 const institutionAddress = import.meta.env.VITE_INSTITUTION_ADDRESS;
+const certificationAddress = import.meta.env.VITE_CERTIFICATION_ADDRESS;
 
 const InstitutePage = () => {
   const [tabValue, setTabValue] = useState(0);
@@ -67,14 +71,43 @@ const InstitutePage = () => {
     }
   };
 
+  const handleGenerateCertificate = async () => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      const certification = new ethers.Contract(
+        certificationAddress,
+        CertificationAbi.abi,
+        signer
+      );
+
+      const candidateName = `${firstname} ${lastname}`;
+      const certId = uuidv4();
+      const createdAt = Date.now();
+
+      const encryptedName = encrypt(candidateName, certId);
+      const encryptedDate = encrypt(createdAt.toString(), certId);
+
+      const tx = await certification.generateCertificate(
+        certId,
+        encryptedName,
+        courseIndex,
+        encryptedDate
+      );
+      await tx.wait();
+
+      setCertificateId(certId);
+      setSubmitSuccess(true);
+    } catch (err) {
+      console.error('Error generating certificate:', err);
+      alert('Certificate generation failed. Check console for details.');
+    }
+  };
+
   useEffect(() => {
     fetchInstituteData();
   }, []);
-
-  const dummyCourses = [
-    { course_name: 'Blockchain Basics' },
-    { course_name: 'Smart Contracts' },
-  ];
 
   return (
     <Grid container justifyContent="center">
@@ -184,7 +217,7 @@ const InstitutePage = () => {
                 <Button
                   variant="contained"
                   color="primary"
-                  onClick={() => setSubmitSuccess(true)}
+                  onClick={handleGenerateCertificate}
                 >
                   Submit
                 </Button>
@@ -229,6 +262,7 @@ const InstitutePage = () => {
               )}
             </Box>
           )}
+          {/* Revoke Certificate */}
           {tabValue === 1 && (
             <Box sx={{ mt: 3 }}>
               <Typography variant="subtitle1" gutterBottom>
