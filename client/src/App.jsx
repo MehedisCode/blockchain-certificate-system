@@ -12,6 +12,7 @@ import NavBarLanding from './Components/NavBarLanding';
 import GenerateCert from './Components/GenerateCert';
 
 // Pages
+import CertificatePage from './Components/CertificatePage';
 import Home from './Components/Home';
 import NavBarInstitute from './Components/NavbarInstitute';
 
@@ -57,7 +58,14 @@ const App = () => {
               </DynamicLayoutRoute>
             }
           />
-
+          <Route
+            path="/certificate/:id"
+            element={
+              <DynamicLayoutRoute layout="LANDING">
+                <CertificatePage />
+              </DynamicLayoutRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
