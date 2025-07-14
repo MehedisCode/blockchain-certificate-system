@@ -67,7 +67,7 @@ const Home = () => {
             color="secondary"
             size="large"
             component={Link}
-            to="/view"
+            to="/view-certificate"
             sx={{
               backgroundColor: 'white',
               color: 'black',

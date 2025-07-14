@@ -15,6 +15,7 @@ import GenerateCert from './Components/GenerateCert';
 import CertificatePage from './Components/CertificatePage';
 import Home from './Components/Home';
 import NavBarInstitute from './Components/NavbarInstitute';
+import ViewCertificate from './Components/ViewCertificate';
 
 // Layout Wrapper
 const DynamicLayoutRoute = ({ layout, children }) => {
@@ -63,6 +64,14 @@ const App = () => {
             element={
               <DynamicLayoutRoute layout="LANDING">
                 <CertificatePage />
+              </DynamicLayoutRoute>
+            }
+          />
+          <Route
+            path="/view-certificate"
+            element={
+              <DynamicLayoutRoute layout="LANDING">
+                <ViewCertificate />
               </DynamicLayoutRoute>
             }
           />
