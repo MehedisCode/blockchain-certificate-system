@@ -44,19 +44,25 @@ npm install
 npx hardhat compile
 ```
 
-### 4. Deploy to Sepolia
+### 4. Compile Contracts
+
+```bash
+node scripts/copyAbis.js
+```
+
+### 5. Deploy to Sepolia
 
 ```bash
 npx hardhat run scripts/deploy.js --network sepolia
 ```
 
-### 5. Update .env
+### 6. Update .env
 
 ```bash
 VITE_INSTITUTION_ADDRESS=0xYourNewContractAddress
 ```
 
-### 6. Start the Frontend
+### 7. Start the Frontend
 
 ```bash
 npm run dev

@@ -29,18 +29,46 @@ function App() {
         signer
       );
 
+      //       ins_name: 'National Institute of Modern Technology (NIMT)',
+      // ins_add: '123 Knowledge Avenue, Dhaka 1212, Bangladesh',
+      // name: 'Md. Arif Hossain',
+      // id: '221-15-4896',
+      // degree: 'Bachelor of Science (B.Sc)',
+      // department: 'Computer Science and Engineering',
+      // father: 'Mr. Abul Kalam Azad',
+      // mother: 'Mrs. Rokeya Sultana',
+      // session: '2021–2024',
+      // cgpa: '3.85',
+      // certId: 'CERT-BSC-2025-045-CS'
+
       // institute data
-      const name = 'My Blockchain Institute 3';
-      const acronym = 'MBI';
-      const link = 'https://mbi.edu';
-      const courses = [['Blockchain Basics']];
+      const name = 'National Institute of Modern Technology';
+      const address = '123 Knowledge Avenue, Dhaka 1212, Bangladesh';
+      const acronym = 'NIMT';
+      const link = 'https://nimt.edu';
+      const degrees = [
+        { degree_name: 'Bachelor of Science (B.Sc)' },
+        { degree_name: 'Bachelor of Arts (B.A)' },
+        { degree_name: 'Master of Science (M.Sc)' },
+        { degree_name: 'Master of Arts (M.A)' },
+      ];
+
+      const departments = [
+        { department_name: 'Computer Science and Engineering' },
+        { department_name: 'Electrical and Electronic Engineering' },
+        { department_name: 'Business Administration' },
+        { department_name: 'Mechanical Engineering' },
+        { department_name: 'Civil Engineering' },
+      ];
 
       const tx = await institution.addInstitute(
         userAddress,
         name,
+        address,
         acronym,
         link,
-        courses
+        degrees,
+        departments
       );
 
       console.log('Submitted tx:', tx.hash);
@@ -74,6 +102,7 @@ function App() {
       }
 
       const data = await institution.getInstituteData();
+      console.log(data);
       setInstitute(data);
     } catch (err) {
       console.error('Error:', err);
@@ -158,8 +187,8 @@ function App() {
             </p>
             <h4 className="mt-4 font-semibold">Courses:</h4>
             <ul className="ml-6 list-disc">
-              {institute[3].map((course, idx) => (
-                <li key={idx}>{course.course_name}</li>
+              {institute[4].map((course, idx) => (
+                <li key={idx}>{course.degree_name}</li>
               ))}
             </ul>
           </div>

@@ -14,23 +14,49 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 const ViewCertificate = () => {
   const [certId, setCertId] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
 
   const baseUrl = `${window.location.origin}/certificate`;
 
   const handleCopyLink = () => {
+    if (certId.trim() === '') {
+      setError('Please enter a certificate ID first.');
+      return;
+    }
+    setError('');
     const fullLink = `${baseUrl}/${certId}`;
     navigator.clipboard.writeText(fullLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleOpenLink = () => {
-    const fullLink = `${baseUrl}/${certId}`;
-    window.open(fullLink, '_blank');
+  const handleOpenLink = async () => {
+    if (certId.trim() === '') {
+      setError('Please enter a certificate ID first.');
+      return;
+    }
+    setError('');
+
+    try {
+      const res = await fetch(`${baseUrl}/${certId}.json`);
+      const data = await res.json();
+
+      if (!data || !data.name) {
+        setError('Certificate not found or invalid.');
+        return;
+      }
+
+      window.open(`${baseUrl}/${certId}`, '_blank');
+    } catch (err) {
+      setError('Certificate not found or invalid.');
+    }
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 6 }}>
+    <Container maxWidth="sm" sx={{ mt: 6 }}>
       <Typography variant="h4" align="center" color="primary" gutterBottom>
-        Welcome, Employers
+        Verify Certificate
       </Typography>
       <Typography
         variant="subtitle1"
@@ -38,8 +64,7 @@ const ViewCertificate = () => {
         color="text.secondary"
         sx={{ mb: 4 }}
       >
-        You may key in the certificate ID to view the verified certificate
-        created on the Ethereum blockchain.
+        Enter a certificate ID to verify its authenticity from the blockchain.
       </Typography>
 
       <Box
@@ -53,10 +78,10 @@ const ViewCertificate = () => {
           alignItems: 'center',
         }}
       >
-        <Card sx={{ border: '2px solid #673ab7', mb: 3 }}>
+        <Card sx={{ border: '2px solid #673ab7', mb: 3, width: '100%' }}>
           <CardContent>
             <Typography variant="h6" align="center" color="primary">
-              View Certificate
+              Enter Certificate ID
             </Typography>
           </CardContent>
         </Card>
@@ -68,17 +93,19 @@ const ViewCertificate = () => {
           value={certId}
           onChange={e => setCertId(e.target.value)}
           sx={{ maxWidth: 400 }}
+          error={Boolean(error)}
+          helperText={error}
         />
 
-        <Fade in={certId !== ''} timeout={500}>
+        <Fade in={certId.trim() !== ''} timeout={500}>
           <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
             <Button
               variant="outlined"
-              color="primary"
+              color={copied ? 'success' : 'primary'}
               onClick={handleCopyLink}
               startIcon={<ContentCopyIcon />}
             >
-              Copy Link
+              {copied ? 'Copied!' : 'Copy Link'}
             </Button>
             <Button
               variant="contained"
@@ -94,7 +121,7 @@ const ViewCertificate = () => {
 
       <Box mt={4} textAlign="center">
         <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-          Demo Certificate IDs (Try these):
+          Try with these Demo Certificate IDs:
         </Typography>
         <Typography variant="body2">
           5085cd9b-bf21-41ab-a668-6769c248806d

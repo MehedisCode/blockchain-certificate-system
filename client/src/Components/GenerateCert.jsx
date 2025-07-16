@@ -29,23 +29,32 @@ const certificationAddress = import.meta.env.VITE_CERTIFICATION_ADDRESS;
 
 const InstitutePage = () => {
   const [tabValue, setTabValue] = useState(0);
-  const [firstname, setFirstname] = useState('');
-  const [lastname, setLastname] = useState('');
-  const [courseIndex, setCourseIndex] = useState(0);
-  const [certificateId, setCertificateId] = useState('1234-5678');
+  const [form, setForm] = useState({
+    name: '',
+    id: '',
+    degree: '',
+    department: '',
+    father: '',
+    mother: '',
+    session: '',
+    cgpa: '',
+  });
+  const [certificateId, setCertificateId] = useState('');
   const [revokeCertificateId, setRevokeCertificateId] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [revokeSuccess, setRevokeSuccess] = useState(false);
 
-  // Institute data from blockchain
   const [instituteName, setInstituteName] = useState('');
-  const [instituteAcronym, setInstituteAcronym] = useState('');
-  const [instituteWebsite, setInstituteWebsite] = useState('');
-  const [instituteCourses, setInstituteCourses] = useState([]);
+  const [instituteAddress, setInstituteAddress] = useState('');
+  const [degrees, setDegrees] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Methods
   const handleTabChange = (_, newValue) => setTabValue(newValue);
+  const handleChange = e => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
   const fetchInstituteData = async () => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -57,13 +66,13 @@ const InstitutePage = () => {
         signer
       );
 
-      const [name, acronym, website, courses] =
+      const [name, address, , , degreeList, departmentList] =
         await institution.getInstituteData();
 
       setInstituteName(name);
-      setInstituteAcronym(acronym);
-      setInstituteWebsite(website);
-      setInstituteCourses(courses.map(c => ({ course_name: c.course_name })));
+      setInstituteAddress(address);
+      setDegrees(degreeList);
+      setDepartments(departmentList);
     } catch (err) {
       console.error('Error loading institute data:', err);
     } finally {
@@ -82,21 +91,27 @@ const InstitutePage = () => {
         signer
       );
 
-      const candidateName = `${firstname} ${lastname}`;
       const certId = uuidv4();
-      const createdAt = Date.now();
-
-      const encryptedName = encrypt(candidateName, certId);
-      const encryptedDate = encrypt(createdAt.toString(), certId);
+      const createdAt = new Date().toISOString(); // use ISO string for date
 
       const tx = await certification.generateCertificate(
         certId,
-        encryptedName,
-        courseIndex,
-        encryptedDate
+        form.name,
+        form.id,
+        form.father,
+        form.mother,
+        degrees.findIndex(
+          d => d.degree_name === form.degree || d === form.degree
+        ),
+        departments.findIndex(
+          d => d.department_name === form.department || d === form.department
+        ),
+        form.cgpa,
+        form.session,
+        createdAt
       );
-      await tx.wait();
 
+      await tx.wait();
       setCertificateId(certId);
       setSubmitSuccess(true);
     } catch (err) {
@@ -121,90 +136,112 @@ const InstitutePage = () => {
         </Typography>
 
         <Paper sx={{ p: 3, mb: 6 }}>
-          <Paper sx={{ p: 3, mb: 6 }}>
-            <AppBar position="static" color="white">
-              <Tabs
-                value={tabValue}
-                onChange={handleTabChange}
-                variant="fullWidth"
-              >
-                <Tab
-                  label="Generate Certificate"
-                  value={0}
-                  sx={{
-                    color: tabValue === 0 ? '#6a1b9a' : '#555',
-                    backgroundColor: tabValue === 0 ? 'transparent' : '#e0e0e0',
-                    textTransform: 'none',
-                  }}
-                />
-                <Tab
-                  label="Revoke Certificate"
-                  value={1}
-                  sx={{
-                    color: tabValue === 1 ? '#6a1b9a' : '#555',
-                    backgroundColor: tabValue === 1 ? 'transparent' : '#e0e0e0',
-                    textTransform: 'none',
-                  }}
-                />
-              </Tabs>
-            </AppBar>
-          </Paper>
-          {/* Generate Certificate Forum */}
+          <AppBar position="static" color="white">
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              variant="fullWidth"
+            >
+              <Tab
+                label="Generate Certificate"
+                value={0}
+                sx={{
+                  color: tabValue === 0 ? '#6a1b9a' : '#555',
+                  backgroundColor: tabValue === 0 ? 'transparent' : '#e0e0e0',
+                  textTransform: 'none',
+                }}
+              />
+              <Tab
+                label="Revoke Certificate"
+                value={1}
+                sx={{
+                  color: tabValue === 1 ? '#6a1b9a' : '#555',
+                  backgroundColor: tabValue === 1 ? 'transparent' : '#e0e0e0',
+                  textTransform: 'none',
+                }}
+              />
+            </Tabs>
+          </AppBar>
+
+          {/* Generate Certificate Form */}
           {tabValue === 0 && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Input the certificate details below to generate a certificate
-              </Typography>
-
               <TextField
+                label="Student Name"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
                 fullWidth
-                label="Institute Name"
-                value={instituteName}
                 margin="normal"
-                InputProps={{ readOnly: true }}
               />
               <TextField
+                label="Student ID"
+                name="id"
+                value={form.id}
+                onChange={handleChange}
                 fullWidth
-                label="Institute Acronym"
-                value={instituteAcronym}
                 margin="normal"
-                InputProps={{ readOnly: true }}
               />
-              <TextField
-                fullWidth
-                label="Institute Website"
-                value={instituteWebsite}
-                margin="normal"
-                InputProps={{ readOnly: true }}
-              />
-
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
-                <TextField
-                  label="First Name"
-                  value={firstname}
-                  onChange={e => setFirstname(e.target.value)}
-                />
-                <TextField
-                  label="Last Name"
-                  value={lastname}
-                  onChange={e => setLastname(e.target.value)}
-                />
-              </Box>
-
-              <FormControl fullWidth sx={{ mt: 3 }}>
-                <InputLabel>Course</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Degree</InputLabel>
                 <Select
-                  value={courseIndex}
-                  label="Course"
-                  onChange={e => setCourseIndex(e.target.value)}
+                  name="degree"
+                  value={form.degree}
+                  onChange={handleChange}
                 >
-                  {instituteCourses.map((course, index) => (
-                    <MenuItem value={index} key={index}>
-                      {course.course_name}
+                  {degrees.map((d, i) => (
+                    <MenuItem value={d.degree_name || d} key={i}>
+                      {d.degree_name || d}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Department</InputLabel>
+                <Select
+                  name="department"
+                  value={form.department}
+                  onChange={handleChange}
+                >
+                  {departments.map((d, i) => (
+                    <MenuItem value={d.department_name || d} key={i}>
+                      {d.department_name || d}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Father's Name"
+                name="father"
+                value={form.father}
+                onChange={handleChange}
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                label="Mother's Name"
+                name="mother"
+                value={form.mother}
+                onChange={handleChange}
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                label="Session"
+                name="session"
+                value={form.session}
+                onChange={handleChange}
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                label="CGPA"
+                name="cgpa"
+                value={form.cgpa}
+                onChange={handleChange}
+                fullWidth
+                margin="normal"
+              />
 
               <Box
                 sx={{
@@ -221,7 +258,6 @@ const InstitutePage = () => {
                 >
                   Submit
                 </Button>
-
                 {submitSuccess && (
                   <IconButton
                     color="primary"
@@ -262,13 +298,10 @@ const InstitutePage = () => {
               )}
             </Box>
           )}
+
           {/* Revoke Certificate */}
           {tabValue === 1 && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Input the ID of the certificate you want to revoke
-              </Typography>
-
               <TextField
                 fullWidth
                 label="Certificate ID"
@@ -276,7 +309,6 @@ const InstitutePage = () => {
                 onChange={e => setRevokeCertificateId(e.target.value)}
                 margin="normal"
               />
-
               <Box
                 sx={{
                   display: 'flex',
@@ -292,7 +324,6 @@ const InstitutePage = () => {
                 >
                   Revoke
                 </Button>
-
                 {revokeSuccess && (
                   <IconButton
                     color="primary"
@@ -302,7 +333,6 @@ const InstitutePage = () => {
                   </IconButton>
                 )}
               </Box>
-
               {revokeSuccess && (
                 <Box
                   sx={{

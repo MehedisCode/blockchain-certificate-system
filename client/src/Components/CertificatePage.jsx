@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ethers } from 'ethers';
 import CertificationAbi from '../contracts/Certification.json';
-import { decrypt } from './decrypt';
 
 import {
   Box,
@@ -20,10 +19,8 @@ import {
 } from '@mui/material';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { DateRange } from '@mui/icons-material';
 
 const certificationAddress = import.meta.env.VITE_CERTIFICATION_ADDRESS;
-const salt = import.meta.env.VITE_SALT || '';
 
 const CertificatePage = () => {
   const { id } = useParams();
@@ -45,18 +42,29 @@ const CertificatePage = () => {
         );
         const data = await contract.getData(id);
 
+        // data array structure assumed:
+        // [candidateName, candidateId, fatherName, motherName,
+        // degreeName, departmentName, cgpa, session,
+        // creationDate, instituteName, instituteAcronym, instituteLink, revoked]
+
         setCertData({
-          candidateName: decrypt(data[0], id, salt),
-          courseName: data[1],
-          creationDate: decrypt(data[2], id, salt),
-          instituteName: data[3],
-          instituteAcronym: data[4],
-          instituteLink: data[5],
-          revoked: data[6],
+          candidateName: data[0],
+          candidateId: data[1],
+          fatherName: data[2],
+          motherName: data[3],
+          degreeName: data[4],
+          departmentName: data[5],
+          cgpa: data[6],
+          session: data[7],
+          creationDate: data[8],
+          instituteName: data[9],
+          instituteAcronym: data[10],
+          instituteLink: data[11],
+          revoked: data[12],
         });
         setCertExists(true);
       } catch (error) {
-        console.error('Certificate not found:', error);
+        console.error('Certificate not found or error:', error);
         setCertExists(false);
       } finally {
         setLoading(false);
@@ -71,6 +79,7 @@ const CertificatePage = () => {
         Loading Certificate...
       </Typography>
     );
+
   if (!certExists)
     return (
       <Typography color="error" align="center" sx={{ mt: 6 }}>
@@ -80,7 +89,13 @@ const CertificatePage = () => {
 
   const {
     candidateName,
-    courseName,
+    candidateId,
+    fatherName,
+    motherName,
+    degreeName,
+    departmentName,
+    cgpa,
+    session,
     creationDate,
     instituteName,
     instituteAcronym,
@@ -88,14 +103,11 @@ const CertificatePage = () => {
     revoked,
   } = certData;
 
-  const formattedDate = new Date(parseInt(creationDate)).toLocaleDateString(
-    'en-US',
-    {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    }
-  );
+  const formattedDate = new Date(creationDate).toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <Box sx={{ p: 4, maxWidth: 1000, mx: 'auto' }}>
@@ -116,27 +128,53 @@ const CertificatePage = () => {
             alignItems="flex-start"
           >
             <Grid item xs={12} sm={8}>
-              <Typography variant="h6" color="primary">
-                Student Name
+              <Typography variant="h6" color="primary" gutterBottom>
+                Student Details
               </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {candidateName}
+              <Typography>
+                <strong>Name:</strong> {candidateName}
               </Typography>
-
-              <Typography variant="h6" color="primary">
-                Course Name
+              <Typography>
+                <strong>ID:</strong> {candidateId}
               </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {courseName}
+              <Typography>
+                <strong>Father's Name:</strong> {fatherName}
               </Typography>
-
-              <Typography variant="h6" color="primary">
-                Institute
+              <Typography>
+                <strong>Mother's Name:</strong> {motherName}
               </Typography>
-              <Typography variant="body1" sx={{ mb: 1 }}>
+              <Typography
+                sx={{ mt: 2 }}
+                variant="h6"
+                color="primary"
+                gutterBottom
+              >
+                Academic Details
+              </Typography>
+              <Typography>
+                <strong>Degree:</strong> {degreeName}
+              </Typography>
+              <Typography>
+                <strong>Department:</strong> {departmentName}
+              </Typography>
+              <Typography>
+                <strong>CGPA:</strong> {cgpa}
+              </Typography>
+              <Typography>
+                <strong>Session:</strong> {session}
+              </Typography>
+              <Typography
+                sx={{ mt: 2 }}
+                variant="h6"
+                color="primary"
+                gutterBottom
+              >
+                Institute Details
+              </Typography>
+              <Typography>
                 {instituteName} ({instituteAcronym})
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              <Typography>
                 <a
                   href={instituteLink}
                   target="_blank"
@@ -145,11 +183,15 @@ const CertificatePage = () => {
                   {instituteLink}
                 </a>
               </Typography>
-
-              <Typography variant="h6" color="primary">
+              <Typography
+                sx={{ mt: 2 }}
+                variant="h6"
+                color="primary"
+                gutterBottom
+              >
                 Issued On
               </Typography>
-              <Typography variant="body1">{formattedDate}</Typography>
+              <Typography>{formattedDate}</Typography>
             </Grid>
 
             <Grid
@@ -162,7 +204,13 @@ const CertificatePage = () => {
                 icon={revoked ? <CancelIcon /> : <CheckCircleIcon />}
                 label={revoked ? 'Revoked' : 'Verified'}
                 color={revoked ? 'error' : 'success'}
-                sx={{ fontSize: '1rem', px: 2, py: 1, mb: 2 }}
+                sx={{
+                  fontSize: '1rem',
+                  px: 2,
+                  py: 1,
+                  mb: 2,
+                  cursor: 'pointer',
+                }}
                 onClick={() => setOpenDialog(true)}
               />
             </Grid>
@@ -170,7 +218,6 @@ const CertificatePage = () => {
         </Box>
       </Paper>
 
-      {/* Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
         <DialogTitle>
           {revoked ? 'Revoked Certificate' : 'Verified Certificate'}
