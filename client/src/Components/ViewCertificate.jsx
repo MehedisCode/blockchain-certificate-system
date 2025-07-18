@@ -40,12 +40,6 @@ const ViewCertificate = () => {
 
     try {
       const res = await fetch(`${baseUrl}/${certId}.json`);
-      const data = await res.json();
-
-      if (!data || !data.name) {
-        setError('Certificate not found or invalid.');
-        return;
-      }
 
       window.open(`${baseUrl}/${certId}`, '_blank');
     } catch (err) {
@@ -124,7 +118,7 @@ const ViewCertificate = () => {
           Try with these Demo Certificate IDs:
         </Typography>
         <Typography variant="body2">
-          5085cd9b-bf21-41ab-a668-6769c248806d
+          611df958-4d83-4af0-b69b-ac83af2fb1ef
         </Typography>
         <Typography variant="body2">
           5a61d8ed-15bd-4e34-953e-44029f4bbbd6

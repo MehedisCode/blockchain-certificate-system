@@ -4,3 +4,24 @@
   margin: 0;
   padding: 0;
 }
+
+.certificate-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 50%;
+}
+
+.certificate-iframe {
+  width: 100%;
+  height: 50vh;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  max-width: 800px; /* Limit iframe width for better appearance */
+}
+
+@media (max-width: 900px) {
+  .certificate-iframe {
+    height: 50vh; /* Reduce height on smaller screens */
+  }
+}
