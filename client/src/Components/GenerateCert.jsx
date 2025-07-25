@@ -259,7 +259,11 @@ const InstitutePage = () => {
   };
 
   useEffect(() => {
-    fetchInstituteData();
+    if (window.ethereum) {
+      setTimeout(() => {
+        fetchInstituteData();
+      }, 300); // Wait for MetaMask to be ready
+    }
   }, []);
 
   return (
