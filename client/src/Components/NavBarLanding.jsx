@@ -44,6 +44,16 @@ const NavBarLanding = () => {
             <Button component={Link} to="/view-certificate" color="inherit">
               View Cert
             </Button>
+            <Button
+              onClick={() => {
+                localStorage.removeItem('userAddress');
+                setUserAddress(null);
+              }}
+              component={Link}
+              color="inherit"
+            >
+              Log out
+            </Button>
           </Box>
         </Toolbar>
       </AppBar>
