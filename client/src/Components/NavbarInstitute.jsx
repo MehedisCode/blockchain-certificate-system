@@ -55,6 +55,15 @@ const NavBarInstitute = () => {
       <MenuItem component={Link} to="/view" onClick={handleMenuClose}>
         View Certificate
       </MenuItem>
+      <MenuItem
+        component={Link}
+        onClick={() => {
+          localStorage.removeItem('userAddress');
+          setUserAddress(null);
+        }}
+      >
+        Log Out
+      </MenuItem>
     </Menu>
   );
 
