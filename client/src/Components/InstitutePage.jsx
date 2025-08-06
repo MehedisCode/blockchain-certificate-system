@@ -29,7 +29,7 @@ import CertificationAbi from '../contracts/Certification.json';
 const institutionAddress = import.meta.env.VITE_INSTITUTION_ADDRESS;
 const certificationAddress = import.meta.env.VITE_CERTIFICATION_ADDRESS;
 
-const InstitutePage = () => {
+const InstitutePage = ({ userAddress }) => {
   const [tabValue, setTabValue] = useState(0);
   const [form, setForm] = useState({
     name: '',
@@ -152,7 +152,7 @@ const InstitutePage = () => {
           mother: '',
           session: '',
           cgpa: '',
-        }); // Reset form after new file upload
+        });
       } catch (err) {
         console.error('Error parsing Excel file:', err);
         setFileError('Failed to parse Excel file');
@@ -228,7 +228,7 @@ const InstitutePage = () => {
         mother: '',
         session: '',
         cgpa: '',
-      }); // Reset form after submission
+      });
     } catch (err) {
       console.error('Error generating certificate:', err);
       setFileError('Certificate generation failed: ' + err.message);
@@ -262,7 +262,7 @@ const InstitutePage = () => {
     if (window.ethereum) {
       setTimeout(() => {
         fetchInstituteData();
-      }, 300); // Wait for MetaMask to be ready
+      }, 300);
     }
   }, []);
 
@@ -270,7 +270,7 @@ const InstitutePage = () => {
     <Grid container justifyContent="center">
       <Grid item xs={12}>
         <Typography variant="h4" align="center" sx={{ mt: 4 }} color="primary">
-          Welcome, Institute
+          Welcome, <b>{instituteName}</b>
         </Typography>
         <Typography variant="subtitle1" align="center" sx={{ mb: 4 }}>
           You may create or revoke a certificate on the Credentials Ethereum

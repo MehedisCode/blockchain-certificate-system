@@ -1,85 +1,19 @@
-import React from 'react';
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from 'react-router-dom';
-import './App.css';
+import React, { useState } from 'react';
+import Login from './pages/Login';
+import Routing from './Components/Routing';
 
-// Nav
-import NavBarLanding from './Components/NavBarLanding';
-import GenerateCert from './Components/GenerateCert';
+function App() {
+  const [userAddress, setUserAddress] = useState(null);
 
-// Pages
-import CertificatePage from './Components/CertificatePage';
-import Home from './Components/Home';
-import NavBarInstitute from './Components/NavbarInstitute';
-import ViewCertificate from './Components/ViewCertificate';
-
-// Layout Wrapper
-const DynamicLayoutRoute = ({ layout, children }) => {
-  switch (layout) {
-    case 'INSTITUTE': {
-      return (
-        <>
-          <NavBarInstitute />
-          {children}
-        </>
-      );
-    }
-    default:
-      return (
-        <>
-          <NavBarLanding />
-          {children}
-        </>
-      );
-  }
-};
-
-const App = () => {
   return (
-    <div className="App" style={{ backgroundColor: '#fafafa' }}>
-      <Router>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <DynamicLayoutRoute layout="LANDING">
-                <Home />
-              </DynamicLayoutRoute>
-            }
-          />
-          <Route
-            path="/institute"
-            element={
-              <DynamicLayoutRoute layout="INSTITUTE">
-                <GenerateCert />
-              </DynamicLayoutRoute>
-            }
-          />
-          <Route
-            path="/certificate/:id"
-            element={
-              <DynamicLayoutRoute layout="LANDING">
-                <CertificatePage />
-              </DynamicLayoutRoute>
-            }
-          />
-          <Route
-            path="/view-certificate"
-            element={
-              <DynamicLayoutRoute layout="LANDING">
-                <ViewCertificate />
-              </DynamicLayoutRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Router>
+    <div>
+      {!userAddress ? (
+        <Login setUserAddress={setUserAddress} />
+      ) : (
+        <Routing userAddress={userAddress} />
+      )}
     </div>
   );
-};
+}
 
 export default App;
