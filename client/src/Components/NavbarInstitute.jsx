@@ -49,7 +49,7 @@ const NavBarInstitute = () => {
       <MenuItem component={Link} to="/admin" onClick={handleMenuClose}>
         Central Authority Portal
       </MenuItem>
-      <MenuItem component={Link} to="/institute" onClick={handleMenuClose}>
+      <MenuItem component={Link} to="/certificate" onClick={handleMenuClose}>
         Institute Portal
       </MenuItem>
       <MenuItem component={Link} to="/view" onClick={handleMenuClose}>

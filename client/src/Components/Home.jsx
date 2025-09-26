@@ -56,7 +56,7 @@ const Home = () => {
             color="primary"
             size="large"
             component={Link}
-            to="/institute"
+            to="/certificate"
             sx={{ fontWeight: 600 }}
           >
             Issue Certificates

@@ -44,18 +44,14 @@ function App() {
         institutionContractABI.abi,
         signer
       );
-
       setInstitutionContract(contract);
 
       // Logic to fetch role from contract (e.g., Admin, Institute, Student)
       const adminAddress = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
       const isAdmin = userAddress === adminAddress;
-      console.log(adminAddress + ' - ' + userAddress);
-
-      // Check if the user is an Institute
       const isInstitute = await contract.checkInstitutePermission(userAddress);
-      console.log('isInstitute: ' + isInstitute);
-      console.log('isadmin: ' + isAdmin);
+      console.log('Institute check:', isInstitute);
+
       // Set user role based on contract and wallet address
       if (isAdmin) {
         setUserRole('admin');
@@ -64,7 +60,6 @@ function App() {
       } else {
         setUserRole('student');
       }
-      console.log('Detected role:', userRole);
     } catch (error) {
       console.error(error);
       setUserRole('student'); // Default to student if error occurs

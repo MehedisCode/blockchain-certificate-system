@@ -9,7 +9,7 @@ import '../App.css';
 
 // NavBars
 import NavBarLanding from './NavBarLanding';
-import GenerateCert from './InstitutePage';
+import GenerateCert from '../pages/GenerateCertificatePage';
 
 // Pages
 import CertificatePage from './CertificatePage';
@@ -42,9 +42,9 @@ const Routing = ({ institutionContract, userAddress }) => {
             }
           />
           <Route
-            path="/institute"
+            path="/certificate"
             element={
-              <DynamicLayoutRoute layout="INSTITUTE">
+              <DynamicLayoutRoute layout="CERTIFICATE">
                 <GenerateCert userAddress={userAddress} />
               </DynamicLayoutRoute>
             }
