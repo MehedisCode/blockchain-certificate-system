@@ -7,7 +7,7 @@ import {
 } from 'react-router-dom';
 import '../App.css';
 
-// Nav
+// NavBars
 import NavBarLanding from './NavBarLanding';
 import GenerateCert from './InstitutePage';
 
@@ -16,29 +16,19 @@ import CertificatePage from './CertificatePage';
 import Home from './Home';
 import NavBarInstitute from './NavbarInstitute';
 import ViewCertificate from './ViewCertificate';
+import AddInstitutePage from '../pages/AddInstitutePage';
 
 // Layout Wrapper
-const DynamicLayoutRoute = ({ layout, children }) => {
-  switch (layout) {
-    case 'INSTITUTE': {
-      return (
-        <>
-          <NavBarInstitute />
-          {children}
-        </>
-      );
-    }
-    default:
-      return (
-        <>
-          <NavBarLanding />
-          {children}
-        </>
-      );
-  }
+const DynamicLayoutRoute = ({ children }) => {
+  return (
+    <>
+      <NavBarLanding />
+      {children}
+    </>
+  );
 };
 
-const Routing = ({ userAddress }) => {
+const Routing = ({ institutionContract, userAddress }) => {
   return (
     <div className="App" style={{ backgroundColor: '#fafafa' }}>
       <Router>
@@ -72,6 +62,17 @@ const Routing = ({ userAddress }) => {
             element={
               <DynamicLayoutRoute layout="LANDING">
                 <ViewCertificate />
+              </DynamicLayoutRoute>
+            }
+          />
+          <Route
+            path="/add-institute"
+            element={
+              <DynamicLayoutRoute layout="LANDING">
+                <AddInstitutePage
+                  institutionContract={institutionContract}
+                  userAddress={userAddress}
+                />
               </DynamicLayoutRoute>
             }
           />

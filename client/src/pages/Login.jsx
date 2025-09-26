@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ethers } from 'ethers';
 import metamaskLogo from '/images/metamask-logo.svg';
-import backgroundImage from '/images/certificate-background.jpg';
+// import backgroundImage from '/images/certificate-background.jpg';
 
 function Login({ setUserAddress }) {
   const [error, setError] = useState('');
@@ -19,7 +19,10 @@ function Login({ setUserAddress }) {
       setUserAddress(address);
       localStorage.setItem('userAddress', address);
     } catch (err) {
-      setError('User denied wallet connection or an error occurred.');
+      setError(
+        'User denied wallet connection or an error occurred. Error : ' +
+          err.message
+      );
     }
   };
 
