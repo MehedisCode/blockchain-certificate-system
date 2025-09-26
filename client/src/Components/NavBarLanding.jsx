@@ -10,7 +10,9 @@ import {
 import AccountBalanceWalletTwoToneIcon from '@mui/icons-material/AccountBalanceWalletTwoTone';
 import { Link } from 'react-router-dom';
 
-const NavBarLanding = () => {
+const NavBarLanding = ({ setUserAddress }) => {
+  const userRole = localStorage.getItem('userRole');
+
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static" color="default">
@@ -44,6 +46,15 @@ const NavBarLanding = () => {
             <Button component={Link} to="/view-certificate" color="inherit">
               View Cert
             </Button>
+
+            {userRole == 'admin' ? (
+              <Button component={Link} to="/add-institute" color="inherit">
+                Add Institute
+              </Button>
+            ) : (
+              ''
+            )}
+
             <Button
               onClick={() => {
                 localStorage.removeItem('userAddress');

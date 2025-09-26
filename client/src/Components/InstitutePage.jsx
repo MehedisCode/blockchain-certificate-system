@@ -26,7 +26,7 @@ import * as XLSX from 'xlsx';
 import InstitutionAbi from '../contracts/Institution.json';
 import CertificationAbi from '../contracts/Certification.json';
 
-const institutionAddress = import.meta.env.VITE_INSTITUTION_ADDRESS;
+const institutionAddress = import.meta.env.VITE_INSTITUTION_CONTRACT_ADDRESS;
 const certificationAddress = import.meta.env.VITE_CERTIFICATION_ADDRESS;
 
 const InstitutePage = ({ userAddress }) => {
@@ -175,6 +175,13 @@ const InstitutePage = ({ userAddress }) => {
       const [name, address, , , degreeList, departmentList] =
         await institution.getInstituteData();
 
+      console.log('Institute data:', {
+        name,
+        address,
+        degreeList,
+        departmentList,
+      });
+
       setInstituteName(name);
       setInstituteAddress(address);
       setDegrees(degreeList);
@@ -263,6 +270,7 @@ const InstitutePage = ({ userAddress }) => {
       setTimeout(() => {
         fetchInstituteData();
       }, 300);
+      fetchInstituteData();
     }
   }, []);
 

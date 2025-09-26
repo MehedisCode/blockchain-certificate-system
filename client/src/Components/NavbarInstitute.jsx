@@ -59,7 +59,7 @@ const NavBarInstitute = () => {
         component={Link}
         onClick={() => {
           localStorage.removeItem('userAddress');
-          setUserAddress(null);
+          //   setUserAddress(null);
         }}
       >
         Log Out
