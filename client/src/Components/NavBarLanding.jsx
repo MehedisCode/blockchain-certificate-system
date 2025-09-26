@@ -10,9 +10,7 @@ import {
 import AccountBalanceWalletTwoToneIcon from '@mui/icons-material/AccountBalanceWalletTwoTone';
 import { Link } from 'react-router-dom';
 
-const NavBarLanding = ({ setUserAddress }) => {
-  const userRole = localStorage.getItem('userRole');
-
+const NavBarLanding = ({ userRole, setUserAddress }) => {
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static" color="default">

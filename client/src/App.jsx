@@ -67,13 +67,6 @@ function App() {
     setLoading(false); // Set loading to false after checking role
   };
 
-  // Use the updated role state to store it in localStorage
-  useEffect(() => {
-    if (userRole) {
-      localStorage.setItem('userRole', userRole);
-    }
-  }, [userRole]);
-
   return (
     <div>
       {loading ? (

@@ -19,16 +19,16 @@ import ViewCertificate from './ViewCertificate';
 import AddInstitutePage from '../pages/AddInstitutePage';
 
 // Layout Wrapper
-const DynamicLayoutRoute = ({ children }) => {
+const DynamicLayoutRoute = ({ children, userRole }) => {
   return (
     <>
-      <NavBarLanding />
+      <NavBarLanding userRole={userRole} />
       {children}
     </>
   );
 };
 
-const Routing = ({ institutionContract, userAddress }) => {
+const Routing = ({ institutionContract, userAddress, userRole }) => {
   return (
     <div className="App" style={{ backgroundColor: '#fafafa' }}>
       <Router>
@@ -36,7 +36,7 @@ const Routing = ({ institutionContract, userAddress }) => {
           <Route
             path="/"
             element={
-              <DynamicLayoutRoute layout="LANDING">
+              <DynamicLayoutRoute userRole={userRole} layout="LANDING">
                 <Home />
               </DynamicLayoutRoute>
             }
@@ -44,7 +44,7 @@ const Routing = ({ institutionContract, userAddress }) => {
           <Route
             path="/certificate"
             element={
-              <DynamicLayoutRoute layout="CERTIFICATE">
+              <DynamicLayoutRoute userRole={userRole} layout="CERTIFICATE">
                 <GenerateCert userAddress={userAddress} />
               </DynamicLayoutRoute>
             }
@@ -52,7 +52,7 @@ const Routing = ({ institutionContract, userAddress }) => {
           <Route
             path="/certificate/:id"
             element={
-              <DynamicLayoutRoute layout="LANDING">
+              <DynamicLayoutRoute userRole={userRole} layout="VIEWCERTBYID">
                 <CertificatePage />
               </DynamicLayoutRoute>
             }
@@ -60,7 +60,7 @@ const Routing = ({ institutionContract, userAddress }) => {
           <Route
             path="/view-certificate"
             element={
-              <DynamicLayoutRoute layout="LANDING">
+              <DynamicLayoutRoute userRole={userRole} layout="VIEWCERT">
                 <ViewCertificate />
               </DynamicLayoutRoute>
             }
@@ -68,7 +68,7 @@ const Routing = ({ institutionContract, userAddress }) => {
           <Route
             path="/add-institute"
             element={
-              <DynamicLayoutRoute layout="LANDING">
+              <DynamicLayoutRoute userRole={userRole} layout="ADDINSTITUTE">
                 <AddInstitutePage
                   institutionContract={institutionContract}
                   userAddress={userAddress}
