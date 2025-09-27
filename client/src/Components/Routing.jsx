@@ -17,6 +17,7 @@ import Home from './Home';
 import NavBarInstitute from './NavbarInstitute';
 import ViewCertificate from './ViewCertificate';
 import AddInstitutePage from '../pages/AddInstitutePage';
+import ModifyInstitutePage from '../pages/ModifyInstitutePage';
 
 // Layout Wrapper
 const DynamicLayoutRoute = ({ children, userRole }) => {
@@ -73,6 +74,14 @@ const Routing = ({ institutionContract, userAddress, userRole }) => {
                   institutionContract={institutionContract}
                   userAddress={userAddress}
                 />
+              </DynamicLayoutRoute>
+            }
+          />
+          <Route
+            path="/modify-institute"
+            element={
+              <DynamicLayoutRoute userRole={userRole} layout="MODIFY">
+                <ModifyInstitutePage />
               </DynamicLayoutRoute>
             }
           />

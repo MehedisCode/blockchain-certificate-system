@@ -39,9 +39,14 @@ const NavBarLanding = ({ userRole, setUserAddress }) => {
               Central Authority
             </Button>
             {userRole == 'institute' ? (
-              <Button component={Link} to="/certificate" color="inherit">
-                Certificate
-              </Button>
+              <>
+                <Button component={Link} to="/certificate" color="inherit">
+                  Certificate
+                </Button>
+                <Button component={Link} to="/modify-institute" color="inherit">
+                  Modify
+                </Button>
+              </>
             ) : (
               ''
             )}
