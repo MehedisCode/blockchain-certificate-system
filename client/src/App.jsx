@@ -48,6 +48,7 @@ function App() {
 
       // Logic to fetch role from contract (e.g., Admin, Institute, Student)
       const adminAddress = import.meta.env.VITE_ADMIN_WALLET_ADDRESS;
+      console.log('Admin address:', adminAddress);
       const isAdmin = userAddress === adminAddress;
       const isInstitute = await contract.checkInstitutePermission(userAddress);
       console.log('Institute check:', isInstitute);

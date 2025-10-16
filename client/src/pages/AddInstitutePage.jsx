@@ -118,7 +118,7 @@ const AddInstitutePage = () => {
       const degreeList = degrees.length ? degrees : ['General'];
       const departmentList = departments.length ? departments : ['Main'];
 
-      // 👇 encode for tuple[] (struct[]) as the ABI expects
+      // encode for tuple[] (struct[]) as the ABI expects
       const degreeStructs = degreeList.map(name => ({ degree_name: name }));
       const departmentStructs = departmentList.map(name => ({
         department_name: name,

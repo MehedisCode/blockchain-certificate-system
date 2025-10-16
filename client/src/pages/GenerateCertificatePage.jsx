@@ -22,7 +22,7 @@ import LoopIcon from '@mui/icons-material/LoopOutlined';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { ethers } from 'ethers';
 import { v4 as uuidv4 } from 'uuid';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import InstitutionAbi from '../contracts/Institution.json';
 import CertificationAbi from '../contracts/Certification.json';
 
@@ -60,9 +60,10 @@ const GenerateCertificatePage = ({ userAddress }) => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
 
-    // Auto-fill form when Student ID changes
     if (name === 'id' && students.length > 0) {
-      const student = students.find(s => s['Student ID'] === value);
+      const student = students.find(
+        s => String(s['Student ID']).trim() === String(value).trim()
+      );
       if (student) {
         setForm({
           id: value,
@@ -85,7 +86,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+    if (!/\.(xlsx|xls)$/i.test(file.name)) {
       setFileError('Please upload a valid Excel file (.xlsx or .xls)');
       return;
     }
@@ -93,13 +94,16 @@ const GenerateCertificatePage = ({ userAddress }) => {
     const reader = new FileReader();
     reader.onload = event => {
       try {
-        const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(event.target.result, { type: 'binary' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-        // Validate required headers
+        if (!jsonData.length) {
+          setFileError('Excel file appears to be empty');
+          return;
+        }
+
         const requiredHeaders = [
           'Student ID',
           'Name',
@@ -118,20 +122,6 @@ const GenerateCertificatePage = ({ userAddress }) => {
           setFileError(
             `Missing required columns: ${missingHeaders.join(', ')}`
           );
-          setStudents([]);
-          return;
-        }
-
-        // Validate Degree and Department against blockchain data
-        const invalidEntries = jsonData.filter(
-          row =>
-            !degrees.includes(row['Degree']) &&
-            !degrees.some(d => d.degree_name === row['Degree']) &&
-            !departments.includes(row['Department']) &&
-            !departments.some(d => d.department_name === row['Department'])
-        );
-        if (invalidEntries.length > 0) {
-          setFileError('Some rows contain invalid Degree or Department values');
           setStudents([]);
           return;
         }
@@ -159,7 +149,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
         setStudents([]);
       }
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsBinaryString(file);
   };
 
   const fetchInstituteData = async () => {
@@ -189,6 +179,18 @@ const GenerateCertificatePage = ({ userAddress }) => {
 
   const handleGenerateCertificate = async () => {
     try {
+      if (!window.ethereum) {
+        setFileError('MetaMask is not installed');
+        return;
+      }
+
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+      if (!form.name || !form.id || !form.degree || !form.department) {
+        setFileError('Please fill in all required fields before generating.');
+        return;
+      }
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const certification = new ethers.Contract(
@@ -196,6 +198,18 @@ const GenerateCertificatePage = ({ userAddress }) => {
         CertificationAbi.abi,
         signer
       );
+
+      const degreeIndex = degrees.findIndex(
+        d => d.degree_name === form.degree || d === form.degree
+      );
+      const deptIndex = departments.findIndex(
+        d => d.department_name === form.department || d === form.department
+      );
+
+      if (degreeIndex < 0 || deptIndex < 0) {
+        setFileError('Invalid Degree or Department selection');
+        return;
+      }
 
       const certId = uuidv4();
       const createdAt = new Date().toISOString();
@@ -206,19 +220,20 @@ const GenerateCertificatePage = ({ userAddress }) => {
         form.id,
         form.father,
         form.mother,
-        degrees.findIndex(
-          d => d.degree_name === form.degree || d === form.degree
-        ),
-        departments.findIndex(
-          d => d.department_name === form.department || d === form.department
-        ),
+        degreeIndex,
+        deptIndex,
         form.cgpa,
         form.session,
         createdAt
       );
+
+      console.log('Transaction sent:', tx.hash);
       await tx.wait();
+      console.log('Transaction confirmed!');
+
       setCertificateId(certId);
       setSubmitSuccess(true);
+      setFileError(null);
       setForm({
         name: '',
         id: '',
@@ -231,12 +246,21 @@ const GenerateCertificatePage = ({ userAddress }) => {
       });
     } catch (err) {
       console.error('Error generating certificate:', err);
-      setFileError('Certificate generation failed: ' + err.message);
+      setFileError(
+        'Certificate generation failed: ' + (err.reason || err.message)
+      );
     }
   };
 
   const handleRevokeCertificate = async () => {
     try {
+      if (!window.ethereum) {
+        setFileError('MetaMask is not installed');
+        return;
+      }
+
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const certification = new ethers.Contract(
@@ -248,9 +272,12 @@ const GenerateCertificatePage = ({ userAddress }) => {
       const tx = await certification.revokeCertificate(revokeCertificateId);
       await tx.wait();
       setRevokeSuccess(true);
+      setFileError(null);
     } catch (err) {
       console.error('Error revoking certificate:', err);
-      setFileError('Certificate revocation failed: ' + err.message);
+      setFileError(
+        'Certificate revocation failed: ' + (err.reason || err.message)
+      );
     }
   };
 
@@ -284,33 +311,15 @@ const GenerateCertificatePage = ({ userAddress }) => {
               onChange={handleTabChange}
               variant="fullWidth"
             >
-              <Tab
-                label="Generate Certificate"
-                value={0}
-                sx={{
-                  color: tabValue === 0 ? '#6a1b9a' : '#555',
-                  backgroundColor: tabValue === 0 ? 'transparent' : '#e0e0e0',
-                  textTransform: 'none',
-                }}
-              />
-              <Tab
-                label="Revoke Certificate"
-                value={1}
-                sx={{
-                  color: tabValue === 1 ? '#6a1b9a' : '#555',
-                  backgroundColor: tabValue === 1 ? 'transparent' : '#e0e0e0',
-                  textTransform: 'none',
-                }}
-              />
+              <Tab label="Generate Certificate" value={0} />
+              <Tab label="Revoke Certificate" value={1} />
             </Tabs>
           </AppBar>
 
-          {/* Generate Certificate Form */}
           {tabValue === 0 && (
             <Box sx={{ mt: 3 }}>
               <Grid container alignItems="flex-start" spacing={2}>
-                {/* Left Column: Input Fields */}
-                <Grid item xs={12} md={6} sx={{ width: '1024px' }}>
+                <Grid item xs={12} md={6}>
                   <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
                     <Typography variant="h6" color="primary" gutterBottom>
                       Certificate Details
@@ -393,11 +402,11 @@ const GenerateCertificatePage = ({ userAddress }) => {
                     />
                   </Paper>
                 </Grid>
-                {/* Right Column: File Upload and Student ID */}
+
                 <Grid item xs={12} md={6}>
                   <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
                     <Typography gutterBottom sx={{ mb: 2 }}>
-                      From Excel File :
+                      From Excel File:
                     </Typography>
                     <Box sx={{ mb: 2 }}>
                       <Button
@@ -432,7 +441,6 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       fullWidth
                       margin="normal"
                       helperText="Enter ID to auto-fill from uploaded Excel"
-                      sx={{ mt: '0' }}
                     />
                   </Paper>
                 </Grid>
@@ -492,7 +500,6 @@ const GenerateCertificatePage = ({ userAddress }) => {
             </Box>
           )}
 
-          {/* Revoke Certificate */}
           {tabValue === 1 && (
             <Box sx={{ mt: 3 }}>
               <TextField
