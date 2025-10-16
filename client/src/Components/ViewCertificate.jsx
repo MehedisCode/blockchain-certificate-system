@@ -118,7 +118,7 @@ const ViewCertificate = () => {
           Try with these Demo Certificate IDs:
         </Typography>
         <Typography variant="body2">
-          611df958-4d83-4af0-b69b-ac83af2fb1ef
+          b6b72e2b-d5dc-47dc-bf28-1d39e42b8fd3
         </Typography>
         <Typography variant="body2">
           5a61d8ed-15bd-4e34-953e-44029f4bbbd6

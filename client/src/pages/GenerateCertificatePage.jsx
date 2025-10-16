@@ -213,7 +213,6 @@ const GenerateCertificatePage = ({ userAddress }) => {
 
       const certId = uuidv4();
       const createdAt = new Date().toISOString();
-
       const tx = await certification.generateCertificate(
         certId,
         form.name,

@@ -12,7 +12,6 @@ contract Institution {
 
     event instituteAdded(string _instituteName);
 
-    // ✨ NEW events for modify page UX
     event DegreesAdded(address indexed institute, uint256 count);
     event DegreeUpdated(address indexed institute, uint256 index, string newName);
     event DegreeRemoved(address indexed institute, uint256 index);
@@ -36,7 +35,7 @@ contract Institution {
         string institute_link;
     }
 
-    // 🔒 modifier: only the institute wallet itself
+    // only the institute wallet itself
     modifier onlyThisInstitute() {
         require(bytes(institutes[msg.sender].institute_name).length > 0, "Institute not found");
         _;
@@ -80,10 +79,6 @@ contract Institution {
         emit instituteAdded(_institute_name);
         return true;
     }
-
-    // ---------------------------
-    // 🔧 INSTITUTE-SELF FUNCTIONS
-    // ---------------------------
 
     // Add many degrees (from your Modify page)
     function addDegrees(string[] memory names) public onlyThisInstitute {
