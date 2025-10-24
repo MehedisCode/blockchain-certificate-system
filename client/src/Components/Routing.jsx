@@ -38,7 +38,7 @@ const Routing = ({ institutionContract, userAddress, userRole }) => {
             path="/"
             element={
               <DynamicLayoutRoute userRole={userRole} layout="LANDING">
-                <Home />
+                <Home userRole={userRole} />
               </DynamicLayoutRoute>
             }
           />

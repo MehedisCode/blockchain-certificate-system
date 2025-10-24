@@ -9,7 +9,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 
-const Home = () => {
+const Home = ({ userRole }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -51,16 +51,18 @@ const Home = () => {
             gap: 3,
           }}
         >
-          <Button
-            variant="contained"
-            color="primary"
-            size="large"
-            component={Link}
-            to="/certificate"
-            sx={{ fontWeight: 600 }}
-          >
-            Issue Certificates
-          </Button>
+          {userRole !== 'admin' && (
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              component={Link}
+              to="/certificate"
+              sx={{ fontWeight: 600 }}
+            >
+              Issue Certificates
+            </Button>
+          )}
 
           <Button
             variant="contained"
