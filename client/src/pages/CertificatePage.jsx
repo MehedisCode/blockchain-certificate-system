@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ethers } from 'ethers';
 import CertificationAbi from '../contracts/Certification.json';
-import CertificatePDFGenerator from './CertificatePDFGenerator';
+import CertificatePDFGenerator from '../utils/CertificatePDFGenerator';
 import {
   Box,
   Typography,

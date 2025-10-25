@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import Login from './pages/Login';
-import Routing from './Components/Routing';
+import Routing from './routes/Routing';
 import institutionContractABI from './contracts/Institution.json';
 
 function App() {

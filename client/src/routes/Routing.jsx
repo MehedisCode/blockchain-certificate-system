@@ -8,14 +8,14 @@ import {
 import '../App.css';
 
 // NavBars
-import NavBarLanding from './NavBarLanding';
+import NavBarLanding from '../components/NavBarLanding';
 import GenerateCert from '../pages/GenerateCertificatePage';
 
 // Pages
-import CertificatePage from './CertificatePage';
-import Home from './Home';
-import NavBarInstitute from './NavbarInstitute';
-import ViewCertificate from './ViewCertificate';
+import CertificatePage from '../pages/CertificatePage';
+import Home from '../pages/Home';
+import NavBarInstitute from '../components/NavbarInstitute';
+import ViewCertificate from '../pages/ViewCertificate';
 import AddInstitutePage from '../pages/AddInstitutePage';
 import ModifyInstitutePage from '../pages/ModifyInstitutePage';
 
