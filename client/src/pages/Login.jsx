@@ -1,28 +1,125 @@
 import React, { useState } from 'react';
 import { ethers } from 'ethers';
 import metamaskLogo from '/images/metamask-logo.svg';
-// import backgroundImage from '/images/certificate-background.jpg';
 
 function Login({ setUserAddress }) {
   const [error, setError] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  const switchToSepolia = async () => {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0xaa36a7' }], // Sepolia chainId
+      });
+      return true;
+    } catch (switchError) {
+      // This error code indicates that the chain has not been added to MetaMask
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia Test Network',
+                rpcUrls: ['https://rpc.sepolia.org'],
+                nativeCurrency: {
+                  name: 'Sepolia ETH',
+                  symbol: 'ETH',
+                  decimals: 18,
+                },
+                blockExplorerUrls: ['https://sepolia.etherscan.io'],
+              },
+            ],
+          });
+          return true;
+        } catch (addError) {
+          console.error('Error adding Sepolia network:', addError);
+          setError(
+            'Failed to add Sepolia network to MetaMask. Please add it manually.'
+          );
+          return false;
+        }
+      } else {
+        console.error('Error switching to Sepolia:', switchError);
+        setError(
+          'Failed to switch to Sepolia network. Please switch manually.'
+        );
+        return false;
+      }
+    }
+  };
+
+  const checkCurrentNetwork = async () => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const network = await provider.getNetwork();
+      return network.chainId === 11155111n; // Sepolia chain ID
+    } catch (error) {
+      console.error('Error checking network:', error);
+      return false;
+    }
+  };
 
   const connectWallet = async () => {
     if (typeof window.ethereum === 'undefined') {
       setError('MetaMask not detected. Please install MetaMask.');
       return;
     }
+
+    setIsConnecting(true);
+    setError('');
+
     try {
+      // First, check if we're on Sepolia
+      const isOnSepolia = await checkCurrentNetwork();
+
+      // If not on Sepolia, switch automatically
+      if (!isOnSepolia) {
+        const switched = await switchToSepolia();
+        if (!switched) {
+          setIsConnecting(false);
+          return; // Stop if network switch failed
+        }
+      }
+
+      // Now connect to wallet
       const provider = new ethers.BrowserProvider(window.ethereum);
       await provider.send('eth_requestAccounts', []);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
+
+      // Double-check we're on Sepolia after connection
+      const finalNetworkCheck = await checkCurrentNetwork();
+      if (!finalNetworkCheck) {
+        setError(
+          'Please ensure you are connected to Sepolia network in MetaMask.'
+        );
+        setIsConnecting(false);
+        return;
+      }
+
       setUserAddress(address);
       localStorage.setItem('userAddress', address);
     } catch (err) {
-      setError(
-        'User denied wallet connection or an error occurred. Error : ' +
-          err.message
-      );
+      console.error('Connection error:', err);
+      if (err.code === 4001) {
+        setError(
+          'Connection rejected. Please approve the connection in MetaMask.'
+        );
+      } else if (err.code === -32002) {
+        setError(
+          'MetaMask is already processing a request. Please check your MetaMask.'
+        );
+      } else {
+        setError(
+          'User denied wallet connection or an error occurred. Error: ' +
+            err.message
+        );
+      }
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -55,10 +152,11 @@ function Login({ setUserAddress }) {
 
           <button
             onClick={connectWallet}
-            className="flex items-center gap-3 rounded-lg bg-orange-500 px-6 py-3 text-lg font-semibold text-white shadow-lg transition duration-300 hover:bg-orange-600"
+            disabled={isConnecting}
+            className="flex items-center gap-3 rounded-lg bg-orange-500 px-6 py-3 text-lg font-semibold text-white shadow-lg transition duration-300 hover:bg-orange-600 disabled:opacity-50"
           >
             <img src={metamaskLogo} alt="MetaMask" className="h-7 w-7" />
-            Connect with MetaMask
+            {isConnecting ? 'Connecting...' : 'Connect with MetaMask'}
           </button>
 
           {error && (
@@ -68,8 +166,8 @@ function Login({ setUserAddress }) {
           )}
 
           <p className="mt-6 max-w-sm text-xs text-gray-500">
-            Ensure MetaMask is installed and connected to the correct Ethereum
-            network.
+            The app will automatically switch to Sepolia test network when
+            connecting.
           </p>
         </div>
       </div>

@@ -199,3 +199,8 @@ function App() {
 }
 
 export default App;
+
+// const addr = "0xD85392927c2B6fFdeB3cDEf7A31962eEa8386A67"
+// const abi = require("./artifacts/contracts/Institution.sol/Institution.json").abi;
+// const contract = await ethers.getContractAt(abi, addr);
+// await contract.checkInstitutePermission("0xb46f588f7fA05982c96eF2D6934adb128141AaB7");
