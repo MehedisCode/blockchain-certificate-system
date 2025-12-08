@@ -317,8 +317,10 @@ const GenerateCertificatePage = ({ userAddress }) => {
 
           {tabValue === 0 && (
             <Box sx={{ mt: 3 }}>
-              <Grid container alignItems="flex-start" spacing={2}>
-                <Grid item xs={12} md={6}>
+              {/* Main two-column layout */}
+              <div className="container">
+                {/* Left Section: Certificate Details */}
+                <div className="section certificate-details">
                   <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
                     <Typography variant="h6" color="primary" gutterBottom>
                       Certificate Details
@@ -400,9 +402,10 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       margin="normal"
                     />
                   </Paper>
-                </Grid>
+                </div>
 
-                <Grid item xs={12} md={6}>
+                {/* Right Section: From Excel File */}
+                <div className="section from-excel">
                   <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
                     <Typography gutterBottom sx={{ mb: 2 }}>
                       From Excel File:
@@ -442,22 +445,24 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       helperText="Enter ID to auto-fill from uploaded Excel"
                     />
                   </Paper>
-                </Grid>
-              </Grid>
+                </div>
+              </div>
+
+              {/* Submit Button & Success Message */}
               <Box
                 sx={{
                   display: 'flex',
                   justifyContent: 'center',
-                  mt: 3,
+                  mt: 4,
                   gap: 2,
                 }}
               >
                 <Button
                   variant="contained"
-                  color="primary"
+                  size="large"
                   onClick={handleGenerateCertificate}
                 >
-                  Submit
+                  Generate Certificate
                 </Button>
                 {submitSuccess && (
                   <IconButton
@@ -468,32 +473,33 @@ const GenerateCertificatePage = ({ userAddress }) => {
                   </IconButton>
                 )}
               </Box>
+
               {submitSuccess && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mt: 2,
-                  }}
-                >
-                  <Typography variant="body2" sx={{ mr: 1 }}>
-                    Certificate generated with ID {certificateId}
-                  </Typography>
-                  <IconButton
-                    onClick={() => navigator.clipboard.writeText(certificateId)}
-                  >
-                    <FileCopyIcon />
-                  </IconButton>
-                  <Button
-                    variant="outlined"
-                    endIcon={<OpenInNewIcon />}
-                    onClick={() =>
-                      window.open(`/certificate/${certificateId}`, '_blank')
-                    }
-                  >
-                    Open
-                  </Button>
+                <Box sx={{ textAlign: 'center', mt: 3 }}>
+                  <Alert severity="success">
+                    Certificate generated successfully!
+                    <br />
+                    ID: <strong>{certificateId}</strong>
+                    <IconButton
+                      size="small"
+                      onClick={() =>
+                        navigator.clipboard.writeText(certificateId)
+                      }
+                    >
+                      <FileCopyIcon fontSize="small" />
+                    </IconButton>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      endIcon={<OpenInNewIcon />}
+                      onClick={() =>
+                        window.open(`/certificate/${certificateId}`, '_blank')
+                      }
+                      sx={{ ml: 1 }}
+                    >
+                      View Certificate
+                    </Button>
+                  </Alert>
                 </Box>
               )}
             </Box>
