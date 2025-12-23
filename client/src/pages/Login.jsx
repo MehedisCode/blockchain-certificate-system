@@ -72,6 +72,11 @@ function Login({ setUserAddress }) {
     setError('');
 
     try {
+      // Disconnect the previously stored address (force disconnect)
+      localStorage.removeItem('userAddress');
+      // Reset the Ethereum provider
+      window.ethereum.request({ method: 'eth_requestAccounts' }); // This will trigger the login if MetaMask is locked
+
       // First, check if we're on Sepolia
       const isOnSepolia = await checkCurrentNetwork();
 
@@ -86,7 +91,7 @@ function Login({ setUserAddress }) {
 
       // Now connect to wallet
       const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send('eth_requestAccounts', []);
+      await provider.send('eth_requestAccounts', []); // Prompt for wallet login
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
 
