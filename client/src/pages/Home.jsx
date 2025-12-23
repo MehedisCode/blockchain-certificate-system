@@ -12,7 +12,7 @@ import {
 const Home = ({ userRole }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
+  console.log(userRole);
   return (
     <Grid
       container
@@ -51,7 +51,7 @@ const Home = ({ userRole }) => {
             gap: 3,
           }}
         >
-          {userRole !== 'admin' && (
+          {userRole === 'institute' && (
             <Button
               variant="contained"
               color="primary"
