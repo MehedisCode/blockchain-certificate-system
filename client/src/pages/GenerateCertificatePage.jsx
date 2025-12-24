@@ -52,6 +52,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState([]);
   const [fileError, setFileError] = useState(null);
+  const [certificateHistory, setCertificateHistory] = useState([]);
   const fileInputRef = useRef(null);
 
   const handleTabChange = (_, newValue) => setTabValue(newValue);
@@ -233,6 +234,38 @@ const GenerateCertificatePage = ({ userAddress }) => {
       setCertificateId(certId);
       setSubmitSuccess(true);
       setFileError(null);
+
+      // Now, save the certificate to the backend (MongoDB)
+      const certificateData = {
+        certId,
+        name: form.name,
+        studentId: form.id,
+        father: form.father,
+        mother: form.mother,
+        degree: form.degree,
+        department: form.department,
+        cgpa: form.cgpa,
+        session: form.session,
+        createdAt,
+      };
+
+      // Make a POST request to save the certificate to MongoDB
+      const response = await fetch('http://localhost:3000/api/certificates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(certificateData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save certificate');
+      }
+
+      const data = await response.json();
+      console.log('Certificate saved to history:', data.certificate);
+
+      // Reset the form after successful generation
       setForm({
         name: '',
         id: '',
@@ -251,32 +284,15 @@ const GenerateCertificatePage = ({ userAddress }) => {
     }
   };
 
-  const handleRevokeCertificate = async () => {
+  // Fetch certificate history function
+  const fetchCertificateHistory = async () => {
     try {
-      if (!window.ethereum) {
-        setFileError('MetaMask is not installed');
-        return;
-      }
-
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const certification = new ethers.Contract(
-        certificationAddress,
-        CertificationAbi.abi,
-        signer
-      );
-
-      const tx = await certification.revokeCertificate(revokeCertificateId);
-      await tx.wait();
-      setRevokeSuccess(true);
-      setFileError(null);
+      const response = await fetch('http://localhost:3000/api/certificates');
+      const history = await response.json();
+      setCertificateHistory(history); // Store in state
     } catch (err) {
-      console.error('Error revoking certificate:', err);
-      setFileError(
-        'Certificate revocation failed: ' + (err.reason || err.message)
-      );
+      console.error('Error fetching certificate history:', err);
+      setFileError('Failed to fetch certificate history');
     }
   };
 
@@ -291,6 +307,12 @@ const GenerateCertificatePage = ({ userAddress }) => {
       }, 300);
     }
   }, []);
+
+  useEffect(() => {
+    if (tabValue === 2) {
+      fetchCertificateHistory();
+    }
+  }, [tabValue]);
 
   return (
     <Grid container justifyContent="center">
@@ -312,14 +334,13 @@ const GenerateCertificatePage = ({ userAddress }) => {
             >
               <Tab label="Generate Certificate" value={0} />
               <Tab label="Revoke Certificate" value={1} />
+              <Tab label="Certificate History" value={2} />
             </Tabs>
           </AppBar>
 
           {tabValue === 0 && (
             <Box sx={{ mt: 3 }}>
-              {/* Main two-column layout */}
               <div className="container">
-                {/* Left Section: Certificate Details */}
                 <div className="section certificate-details">
                   <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
                     <Typography variant="h6" color="primary" gutterBottom>
@@ -404,7 +425,6 @@ const GenerateCertificatePage = ({ userAddress }) => {
                   </Paper>
                 </div>
 
-                {/* Right Section: From Excel File */}
                 <div className="section from-excel">
                   <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
                     <Typography gutterBottom sx={{ mb: 2 }}>
@@ -433,7 +453,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       )}
                     </Box>
                     <Typography sx={{ fontSize: '12px' }} gutterBottom>
-                      Enter Student ID to extract details from excel file
+                      Enter Student ID to extract details from uploaded excel
                     </Typography>
                     <TextField
                       label="Student ID"
@@ -448,7 +468,6 @@ const GenerateCertificatePage = ({ userAddress }) => {
                 </div>
               </div>
 
-              {/* Submit Button & Success Message */}
               <Box
                 sx={{
                   display: 'flex',
@@ -505,81 +524,37 @@ const GenerateCertificatePage = ({ userAddress }) => {
             </Box>
           )}
 
-          {tabValue === 1 && (
+          {tabValue === 2 && (
             <Box sx={{ mt: 3 }}>
-              <TextField
-                fullWidth
-                label="Certificate ID"
-                value={revokeCertificateId}
-                onChange={e => setRevokeCertificateId(e.target.value)}
-                margin="normal"
-              />
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  mt: 3,
-                  gap: 2,
-                }}
-              >
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  onClick={handleRevokeCertificate}
-                >
-                  Revoke
-                </Button>
-                {revokeSuccess && (
-                  <IconButton
-                    color="primary"
-                    onClick={() => setRevokeSuccess(false)}
-                  >
-                    <LoopIcon />
-                  </IconButton>
-                )}
-              </Box>
-              {revokeSuccess && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mt: 2,
-                  }}
-                >
-                  <Typography variant="body2" sx={{ mr: 1 }}>
-                    Revoked Certificate with ID {revokeCertificateId}
+              <Grid container spacing={2}>
+                {certificateHistory.length > 0 ? (
+                  certificateHistory.map((certificate, index) => (
+                    <Grid item xs={12} md={6} key={index}>
+                      <Paper sx={{ p: 3 }}>
+                        <Typography variant="body1">
+                          Certificate ID: {certificate.certId}
+                        </Typography>
+                        <Typography variant="body2">
+                          Name: {certificate.name}
+                        </Typography>
+                        <Typography variant="body2">
+                          Degree: {certificate.degree}
+                        </Typography>
+                        <Typography variant="body2">
+                          Department: {certificate.department}
+                        </Typography>
+                        <Typography variant="body2">
+                          Date: {certificate.createdAt}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="textSecondary">
+                    No certificates found.
                   </Typography>
-                  <IconButton
-                    onClick={() =>
-                      navigator.clipboard.writeText(revokeCertificateId)
-                    }
-                  >
-                    <FileCopyIcon />
-                  </IconButton>
-                  <Button
-                    variant="outlined"
-                    endIcon={<OpenInNewIcon />}
-                    onClick={() =>
-                      window.open(
-                        `/certificate/${revokeCertificateId}`,
-                        '_blank'
-                      )
-                    }
-                  >
-                    Open
-                  </Button>
-                </Box>
-              )}
-              {fileError && (
-                <Typography
-                  variant="body2"
-                  color="error"
-                  sx={{ mt: 2, textAlign: 'center' }}
-                >
-                  {fileError}
-                </Typography>
-              )}
+                )}
+              </Grid>
             </Box>
           )}
         </Paper>
