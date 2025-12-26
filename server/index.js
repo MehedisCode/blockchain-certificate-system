@@ -8,7 +8,7 @@ const cors = require("cors");
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: "http://localhost:5173" }));
 
 // MongoDB connection using mongoose
 mongoose
@@ -27,6 +27,7 @@ app.post("/api/certificates", async (req, res) => {
   try {
     const {
       certId,
+      instituteAddress,
       name,
       studentId,
       father,
@@ -38,9 +39,26 @@ app.post("/api/certificates", async (req, res) => {
       createdAt,
     } = req.body;
 
-    // Create a new certificate instance
+    if (!instituteAddress) {
+      return res.status(400).json({ error: "instituteAddress is required" });
+    }
+
+    // Check if a certificate already exists for this student and institute
+    const existingCertificate = await Certificate.findOne({
+      studentId,
+      instituteAddress: instituteAddress.toLowerCase(),
+    });
+
+    if (existingCertificate) {
+      return res.status(400).json({
+        error: "This student already has a certificate from this institute.",
+      });
+    }
+
+    // If no existing certificate, create the new one
     const newCertificate = new Certificate({
       certId,
+      instituteAddress: instituteAddress.toLowerCase(),
       name,
       studentId,
       father,
@@ -52,7 +70,7 @@ app.post("/api/certificates", async (req, res) => {
       createdAt,
     });
 
-    // Save the certificate to the database
+    // Save certificate in MongoDB
     await newCertificate.save();
 
     res.status(201).json({
@@ -61,18 +79,30 @@ app.post("/api/certificates", async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating certificate:", err);
-    res.status(500).json({ error: "Failed to create certificate" });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Route to fetch all certificates
 app.get("/api/certificates", async (req, res) => {
   try {
-    const certificates = await Certificate.find();
+    console.log(req.query);
+    const { instituteAddress } = req.query;
+
+    if (!instituteAddress) {
+      return res
+        .status(400)
+        .json({ error: "instituteAddress query is required" });
+    }
+
+    const certificates = await Certificate.find({
+      instituteAddress: instituteAddress.toLowerCase(),
+    }).sort({ createdAt: -1 });
+
     res.json(certificates);
   } catch (err) {
     console.error("Error fetching certificate history:", err);
-    res.status(500).json({ error: "Failed to fetch certificate history" });
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Typography,
   AppBar,
@@ -42,9 +42,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
     cgpa: '',
   });
   const [certificateId, setCertificateId] = useState('');
-  const [revokeCertificateId, setRevokeCertificateId] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [revokeSuccess, setRevokeSuccess] = useState(false);
   const [instituteName, setInstituteName] = useState('');
   const [instituteAddress, setInstituteAddress] = useState('');
   const [degrees, setDegrees] = useState([]);
@@ -52,7 +50,18 @@ const GenerateCertificatePage = ({ userAddress }) => {
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState([]);
   const [fileError, setFileError] = useState(null);
+
   const [certificateHistory, setCertificateHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Search states for history
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchField, setSearchField] = useState('all');
+  const [appliedSearch, setAppliedSearch] = useState({
+    term: '',
+    field: 'all',
+  });
+
   const fileInputRef = useRef(null);
 
   const handleTabChange = (_, newValue) => setTabValue(newValue);
@@ -194,6 +203,53 @@ const GenerateCertificatePage = ({ userAddress }) => {
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
+      const instituteAddress = (await signer.getAddress()).toLowerCase();
+
+      // Check if the student already has a certificate
+      const response = await fetch(
+        `http://localhost:3000/api/certificates?instituteAddress=${instituteAddress}&studentId=${form.id}`
+      );
+
+      const data = await response.json();
+      if (response.status === 400 && data.error) {
+        setFileError(data.error); // Show the error message if certificate exists
+        return;
+      }
+
+      // First, save certificate to MongoDB (before blockchain interaction)
+      const certId = uuidv4();
+      const createdAt = new Date().toISOString();
+
+      const certificateData = {
+        certId,
+        instituteAddress,
+        name: form.name,
+        studentId: form.id,
+        father: form.father,
+        mother: form.mother,
+        degree: form.degree,
+        department: form.department,
+        cgpa: form.cgpa,
+        session: form.session,
+        createdAt,
+      };
+
+      const postResponse = await fetch(
+        'http://localhost:3000/api/certificates',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(certificateData),
+        }
+      );
+
+      if (!postResponse.ok)
+        throw new Error('Failed to save certificate to MongoDB');
+
+      const postData = await postResponse.json();
+      console.log('Certificate saved to history:', postData.certificate);
+
+      // Now, generate certificate on the blockchain
       const certification = new ethers.Contract(
         certificationAddress,
         CertificationAbi.abi,
@@ -212,8 +268,6 @@ const GenerateCertificatePage = ({ userAddress }) => {
         return;
       }
 
-      const certId = uuidv4();
-      const createdAt = new Date().toISOString();
       const tx = await certification.generateCertificate(
         certId,
         form.name,
@@ -235,37 +289,6 @@ const GenerateCertificatePage = ({ userAddress }) => {
       setSubmitSuccess(true);
       setFileError(null);
 
-      // Now, save the certificate to the backend (MongoDB)
-      const certificateData = {
-        certId,
-        name: form.name,
-        studentId: form.id,
-        father: form.father,
-        mother: form.mother,
-        degree: form.degree,
-        department: form.department,
-        cgpa: form.cgpa,
-        session: form.session,
-        createdAt,
-      };
-
-      // Make a POST request to save the certificate to MongoDB
-      const response = await fetch('http://localhost:3000/api/certificates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(certificateData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save certificate');
-      }
-
-      const data = await response.json();
-      console.log('Certificate saved to history:', data.certificate);
-
-      // Reset the form after successful generation
       setForm({
         name: '',
         id: '',
@@ -284,12 +307,20 @@ const GenerateCertificatePage = ({ userAddress }) => {
     }
   };
 
-  // Fetch certificate history function
   const fetchCertificateHistory = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/certificates');
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const instituteAddress = (await signer.getAddress()).toLowerCase();
+
+      const response = await fetch(
+        `http://localhost:3000/api/certificates?instituteAddress=${instituteAddress}`
+      );
+
+      if (!response.ok) throw new Error('Failed to fetch certificate history');
+
       const history = await response.json();
-      setCertificateHistory(history); // Store in state
+      setCertificateHistory(history);
     } catch (err) {
       console.error('Error fetching certificate history:', err);
       setFileError('Failed to fetch certificate history');
@@ -300,6 +331,48 @@ const GenerateCertificatePage = ({ userAddress }) => {
     fileInputRef.current.click();
   };
 
+  // Apply search button click
+  const handleSearch = () => {
+    setAppliedSearch({ term: searchTerm.trim(), field: searchField });
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setSearchField('all');
+    setAppliedSearch({ term: '', field: 'all' });
+  };
+
+  // Filtered history based on applied search
+  const filteredHistory = useMemo(() => {
+    const term = (appliedSearch.term || '').toLowerCase();
+    const field = appliedSearch.field;
+
+    if (!term) return certificateHistory;
+
+    const match = val =>
+      String(val ?? '')
+        .toLowerCase()
+        .includes(term);
+
+    return certificateHistory.filter(c => {
+      if (field === 'certId') return match(c.certId);
+      if (field === 'studentId') return match(c.studentId);
+      if (field === 'name') return match(c.name);
+      if (field === 'degree') return match(c.degree);
+      if (field === 'department') return match(c.department);
+
+      // all
+      return (
+        match(c.certId) ||
+        match(c.studentId) ||
+        match(c.name) ||
+        match(c.degree) ||
+        match(c.department) ||
+        match(c.createdAt)
+      );
+    });
+  }, [certificateHistory, appliedSearch]);
+
   useEffect(() => {
     if (window.ethereum) {
       setTimeout(() => {
@@ -309,8 +382,10 @@ const GenerateCertificatePage = ({ userAddress }) => {
   }, []);
 
   useEffect(() => {
-    if (tabValue === 2) {
+    if (tabValue === 1) {
       fetchCertificateHistory();
+      // reset applied search when entering history tab (optional)
+      // setAppliedSearch({ term: '', field: 'all' });
     }
   }, [tabValue]);
 
@@ -321,8 +396,8 @@ const GenerateCertificatePage = ({ userAddress }) => {
           Welcome, <b>{instituteName}</b>
         </Typography>
         <Typography variant="subtitle1" align="center" sx={{ mb: 4 }}>
-          You may create or revoke a certificate on the Credentials Ethereum
-          Blockchain below
+          You may create a certificate on the Credentials Ethereum Blockchain
+          below
         </Typography>
 
         <Paper sx={{ p: 3, mb: 6 }}>
@@ -333,11 +408,11 @@ const GenerateCertificatePage = ({ userAddress }) => {
               variant="fullWidth"
             >
               <Tab label="Generate Certificate" value={0} />
-              <Tab label="Revoke Certificate" value={1} />
-              <Tab label="Certificate History" value={2} />
+              <Tab label="Certificate History" value={1} />
             </Tabs>
           </AppBar>
 
+          {/* TAB 0: Generate */}
           {tabValue === 0 && (
             <Box sx={{ mt: 3 }}>
               <div className="container">
@@ -346,6 +421,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                     <Typography variant="h6" color="primary" gutterBottom>
                       Certificate Details
                     </Typography>
+
                     <TextField
                       label="Student Name"
                       name="name"
@@ -354,6 +430,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       fullWidth
                       margin="normal"
                     />
+
                     <TextField
                       label="Student ID"
                       name="id"
@@ -362,6 +439,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       fullWidth
                       margin="normal"
                     />
+
                     <FormControl fullWidth margin="normal">
                       <InputLabel>Degree</InputLabel>
                       <Select
@@ -376,6 +454,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                         ))}
                       </Select>
                     </FormControl>
+
                     <FormControl fullWidth margin="normal">
                       <InputLabel>Department</InputLabel>
                       <Select
@@ -390,6 +469,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                         ))}
                       </Select>
                     </FormControl>
+
                     <TextField
                       label="Father's Name"
                       name="father"
@@ -398,6 +478,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       fullWidth
                       margin="normal"
                     />
+
                     <TextField
                       label="Mother's Name"
                       name="mother"
@@ -406,6 +487,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       fullWidth
                       margin="normal"
                     />
+
                     <TextField
                       label="Session"
                       name="session"
@@ -414,6 +496,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       fullWidth
                       margin="normal"
                     />
+
                     <TextField
                       label="CGPA"
                       name="cgpa"
@@ -430,6 +513,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                     <Typography gutterBottom sx={{ mb: 2 }}>
                       From Excel File:
                     </Typography>
+
                     <Box sx={{ mb: 2 }}>
                       <Button
                         variant="outlined"
@@ -439,6 +523,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                       >
                         Choose Excel File
                       </Button>
+
                       <input
                         type="file"
                         accept=".xlsx,.xls"
@@ -446,15 +531,18 @@ const GenerateCertificatePage = ({ userAddress }) => {
                         ref={fileInputRef}
                         style={{ display: 'none' }}
                       />
+
                       {fileError && (
                         <Alert severity="error" sx={{ mt: 1 }}>
                           {fileError}
                         </Alert>
                       )}
                     </Box>
+
                     <Typography sx={{ fontSize: '12px' }} gutterBottom>
                       Enter Student ID to extract details from uploaded excel
                     </Typography>
+
                     <TextField
                       label="Student ID"
                       name="id"
@@ -483,6 +571,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
                 >
                   Generate Certificate
                 </Button>
+
                 {submitSuccess && (
                   <IconButton
                     color="primary"
@@ -524,37 +613,119 @@ const GenerateCertificatePage = ({ userAddress }) => {
             </Box>
           )}
 
-          {tabValue === 2 && (
+          {/* TAB 1: Certificate History */}
+          {tabValue === 1 && (
             <Box sx={{ mt: 3 }}>
-              <Grid container spacing={2}>
-                {certificateHistory.length > 0 ? (
-                  certificateHistory.map((certificate, index) => (
-                    <Grid item xs={12} md={6} key={index}>
-                      <Paper sx={{ p: 3 }}>
-                        <Typography variant="body1">
-                          Certificate ID: {certificate.certId}
-                        </Typography>
-                        <Typography variant="body2">
-                          Name: {certificate.name}
-                        </Typography>
-                        <Typography variant="body2">
-                          Degree: {certificate.degree}
-                        </Typography>
-                        <Typography variant="body2">
-                          Department: {certificate.department}
-                        </Typography>
-                        <Typography variant="body2">
-                          Date: {certificate.createdAt}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  ))
-                ) : (
-                  <Typography variant="body2" color="textSecondary">
-                    No certificates found.
+              {/* Search bar */}
+              <Paper elevation={2} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} md={3}>
+                    <FormControl fullWidth>
+                      <InputLabel>Search By</InputLabel>
+                      <Select
+                        value={searchField}
+                        label="Search By"
+                        onChange={e => setSearchField(e.target.value)}
+                      >
+                        <MenuItem value="all">All</MenuItem>
+                        <MenuItem value="certId">Certificate ID</MenuItem>
+                        <MenuItem value="studentId">Student ID</MenuItem>
+                        <MenuItem value="name">Name</MenuItem>
+                        <MenuItem value="degree">Degree</MenuItem>
+                        <MenuItem value="department">Department</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Search"
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      fullWidth
+                      placeholder="Type keyword (e.g., certId, studentId, name...)"
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={3}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        onClick={handleSearch}
+                      >
+                        Search
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        onClick={handleClearSearch}
+                      >
+                        Clear
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Showing: <b>{filteredHistory.length}</b> result(s)
                   </Typography>
-                )}
-              </Grid>
+                  {appliedSearch.term ? (
+                    <Typography variant="caption" color="text.secondary">
+                      Filter: <b>{appliedSearch.field}</b> contains "
+                      <b>{appliedSearch.term}</b>"
+                    </Typography>
+                  ) : null}
+                </Box>
+              </Paper>
+
+              {/* Errors */}
+              {fileError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {fileError}
+                </Alert>
+              )}
+
+              {/* List */}
+              {historyLoading ? (
+                <Typography>Loading history...</Typography>
+              ) : (
+                <Grid container spacing={2}>
+                  {filteredHistory.length > 0 ? (
+                    filteredHistory.map((certificate, index) => (
+                      <Grid item xs={12} md={6} key={certificate._id || index}>
+                        <Paper sx={{ p: 3 }}>
+                          <Typography variant="body1">
+                            Certificate ID: {certificate.certId}
+                          </Typography>
+                          <Typography variant="body2">
+                            Student ID: {certificate.studentId}
+                          </Typography>
+                          <Typography variant="body2">
+                            Name: {certificate.name}
+                          </Typography>
+                          <Typography variant="body2">
+                            Degree: {certificate.degree}
+                          </Typography>
+                          <Typography variant="body2">
+                            Department: {certificate.department}
+                          </Typography>
+                          <Typography variant="body2">
+                            Date: {certificate.createdAt}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    ))
+                  ) : (
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="textSecondary">
+                        No certificates found.
+                      </Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              )}
             </Box>
           )}
         </Paper>

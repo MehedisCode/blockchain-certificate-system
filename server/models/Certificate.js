@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 
 const certificateSchema = new mongoose.Schema({
-  certId: { type: String, required: true },
+  certId: { type: String, required: true, unique: true, index: true },
+  instituteAddress: { type: String, required: true, index: true },
   name: { type: String, required: true },
   studentId: { type: String, required: true },
   father: { type: String, required: true },
