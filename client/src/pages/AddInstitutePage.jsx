@@ -7,18 +7,20 @@ import {
   CircularProgress,
   Snackbar,
   Stack,
+  Alert,
+  Typography,
+  Paper,
+  Grid, // ADD THIS IMPORT
 } from '@mui/material';
 import { ethers } from 'ethers';
 import INSTITUTION_ABI from '../contracts/Institution.json';
 
 const AddInstitutePage = () => {
-  const [instituteWallet, setInstituteWallet] = useState(''); // 0x... address for the institute
+  const [instituteWallet, setInstituteWallet] = useState('');
   const [instituteName, setInstituteName] = useState('');
-  const [instituteAddrText, setInstituteAddrText] = useState(''); // postal/physical address text
+  const [instituteAddrText, setInstituteAddrText] = useState('');
   const [instituteAcronym, setInstituteAcronym] = useState('');
   const [instituteLink, setInstituteLink] = useState('');
-
-  // optional comma-separated inputs for simplicity
   const [degreesCsv, setDegreesCsv] = useState('');
   const [departmentsCsv, setDepartmentsCsv] = useState('');
 
@@ -26,7 +28,7 @@ const AddInstitutePage = () => {
   const [successMessage, setSuccess] = useState('');
   const [errorMessage, setError] = useState('');
 
-  // Build arrays from CSV, trimming empties
+  // Build arrays from CSV
   const degrees = useMemo(
     () =>
       degreesCsv
@@ -54,7 +56,7 @@ const AddInstitutePage = () => {
       !instituteAcronym ||
       !instituteLink
     ) {
-      setError('All fields are required (including the institute wallet)!');
+      setError('All fields are required!');
       return;
     }
 
@@ -63,28 +65,28 @@ const AddInstitutePage = () => {
     try {
       instituteWalletChecksum = ethers.getAddress(instituteWallet);
     } catch {
-      setError('Invalid institute wallet address (must be 0x...)');
+      setError('Invalid wallet address (must be 0x...)');
       return;
     }
 
     try {
       if (!window.ethereum) {
-        setError('MetaMask is not available in this browser.');
+        setError('MetaMask is not available.');
         return;
       }
 
       setLoading(true);
+      setError('');
 
-      // v6: BrowserProvider + awaited signer
       const provider = new ethers.BrowserProvider(window.ethereum);
       await provider.send('eth_requestAccounts', []);
       const signer = await provider.getSigner();
 
-      //   Ensure only the Admin (contract owner) calls addInstitute
-      //   (optional client-side check if you want)
+      // Check if caller is admin (optional)
       const adminEnv = import.meta.env.VITE_ADMIN_WALLET_ADDRESS?.toLowerCase();
       const caller = (await signer.getAddress()).toLowerCase();
-      if (caller !== adminEnv) {
+
+      if (adminEnv && caller !== adminEnv) {
         setError('Only admin can add institutes.');
         setLoading(false);
         return;
@@ -92,54 +94,61 @@ const AddInstitutePage = () => {
 
       const contractAddress = import.meta.env.VITE_INSTITUTION_CONTRACT_ADDRESS;
       if (!contractAddress) {
-        setError('VITE_INSTITUTION_CONTRACT_ADDRESS is not set.');
+        setError('Contract address not configured.');
         setLoading(false);
         return;
       }
 
-      // quick code presence check
+      // Check contract exists
       const code = await provider.getCode(contractAddress);
       if (code === '0x') {
-        setError(
-          'No contract found at VITE_INSTITUTION_CONTRACT_ADDRESS (wrong network or bad address).'
-        );
+        setError('No contract found at this address.');
         setLoading(false);
         return;
       }
 
-      // signer-backed instance (we’re writing)
       const institutionContract = new ethers.Contract(
         contractAddress,
         INSTITUTION_ABI.abi,
         signer
       );
 
-      // Your current fallbacks
-      const degreeList = degrees.length ? degrees : ['General'];
-      const departmentList = departments.length ? departments : ['Main'];
+      // ✅ FIXED: Use arrays of strings, NOT struct objects
+      // Your contract expects: string[] memory initialDegrees, string[] memory initialDepartments
+      const degreeList = degrees.length > 0 ? degrees : ['General'];
+      const departmentList = departments.length > 0 ? departments : ['Main'];
 
-      // encode for tuple[] (struct[]) as the ABI expects
-      const degreeStructs = degreeList.map(name => ({ degree_name: name }));
-      const departmentStructs = departmentList.map(name => ({
-        department_name: name,
-      }));
+      console.log('Calling addInstitute with:', {
+        wallet: instituteWalletChecksum,
+        name: instituteName,
+        address: instituteAddrText,
+        acronym: instituteAcronym,
+        link: instituteLink,
+        degrees: degreeList,
+        departments: departmentList,
+      });
 
-      // NOTE: ABI is declared with (string)[] for tuples, so pass strings only (positional form)
-      // If you compile ABI from Hardhat JSON with named components, you can also pass objects of the form { degree_name: "..." }.
+      // ✅ Correct way: Pass arrays of strings
       const tx = await institutionContract.addInstitute(
-        instituteWalletChecksum,
-        instituteName,
-        instituteAddrText,
-        instituteAcronym,
-        instituteLink,
-        degreeStructs, // <-- tuple[]: { degree_name: string }
-        departmentStructs // <-- tuple[]: { department_name: string }
+        instituteWalletChecksum, // address
+        instituteName, // string
+        instituteAddrText, // string
+        instituteAcronym, // string
+        instituteLink, // string
+        degreeList, // string[] (NOT struct[])
+        departmentList // string[] (NOT struct[])
       );
 
-      await tx.wait();
+      console.log('Transaction sent:', tx.hash);
 
-      setSuccess('Institute added successfully!');
-      // reset form
+      const receipt = await tx.wait();
+      console.log('Transaction confirmed:', receipt);
+
+      setSuccess(
+        `Institute "${instituteName}" added successfully! Transaction: ${tx.hash.slice(0, 10)}...`
+      );
+
+      // Reset form
       setInstituteWallet('');
       setInstituteName('');
       setInstituteAddrText('');
@@ -148,110 +157,217 @@ const AddInstitutePage = () => {
       setDegreesCsv('');
       setDepartmentsCsv('');
     } catch (err) {
-      console.error(err);
-      // surface a helpful revert if it’s the “only owner” require
-      const msg = (
-        err?.info?.error?.message ||
-        err?.shortMessage ||
-        err?.message ||
-        ''
-      ).toString();
-      if (
-        msg.includes('only owner') ||
-        msg.includes('Caller must be the owner')
-      ) {
-        setError(
-          'Transaction reverted: only the admin (contract owner) can add an institute.'
-        );
-      } else if (
-        msg.includes('Atleast one degree') ||
-        msg.includes('Atleast one department')
-      ) {
-        setError(
-          'This contract requires at least one degree and one department.'
-        );
-      } else {
-        setError('Failed to add institute. See console for details.');
+      console.error('Error adding institute:', err);
+
+      // Parse error message
+      let errorMsg = 'Failed to add institute.';
+
+      if (err.message) {
+        // Check for specific error patterns
+        if (err.message.includes('revert')) {
+          if (
+            err.message.includes('only owner') ||
+            err.message.includes('Only owner')
+          ) {
+            errorMsg = 'Only contract owner (admin) can add institutes.';
+          } else if (err.message.includes('already exists')) {
+            errorMsg = 'Institute with this wallet already exists.';
+          } else if (
+            err.message.includes('Atleast one degree') ||
+            err.message.includes('At least one degree')
+          ) {
+            errorMsg = 'At least one degree is required.';
+          } else if (
+            err.message.includes('Atleast one department') ||
+            err.message.includes('At least one department')
+          ) {
+            errorMsg = 'At least one department is required.';
+          } else {
+            errorMsg = `Transaction reverted: ${err.message.split('revert')[1]?.slice(0, 100)}...`;
+          }
+        } else if (err.message.includes('user rejected')) {
+          errorMsg = 'Transaction was rejected by user.';
+        } else if (err.message.includes('insufficient funds')) {
+          errorMsg = 'Insufficient funds for gas.';
+        } else {
+          errorMsg = err.message;
+        }
       }
+
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Box sx={{ maxWidth: 720, mx: 'auto', p: 3 }}>
-      <h2>Add New Institute</h2>
+  const handleKeyPress = e => {
+    if (e.key === 'Enter') {
+      handleAddInstitute();
+    }
+  };
 
-      <Stack spacing={2}>
+  return (
+    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
+      <Typography variant="h4" gutterBottom color="primary">
+        Add New Institute
+      </Typography>
+
+      <Paper sx={{ p: 3, mb: 3, bgcolor: 'grey.50' }}>
+        <Typography variant="body2" color="text.secondary">
+          Add a new institute to the blockchain. The institute wallet address
+          will be able to issue certificates.
+        </Typography>
+      </Paper>
+
+      {errorMessage && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {errorMessage}
+        </Alert>
+      )}
+
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {successMessage}
+        </Alert>
+      )}
+
+      <Stack spacing={3}>
         <TextField
-          label="Institute Wallet (0x...)"
+          label="Institute Wallet Address *"
           value={instituteWallet}
           onChange={e => setInstituteWallet(e.target.value)}
-          placeholder="0xabc..."
+          onKeyPress={handleKeyPress}
+          placeholder="0x742d35Cc6634C0532925a3b844Bc9e... (Ethereum address)"
           fullWidth
+          required
+          helperText="The wallet address that will issue certificates"
         />
+
         <TextField
-          label="Institute Name"
+          label="Institute Name *"
           value={instituteName}
           onChange={e => setInstituteName(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="University of Technology"
           fullWidth
+          required
         />
+
         <TextField
-          label="Institute Physical Address"
+          label="Physical Address *"
           value={instituteAddrText}
           onChange={e => setInstituteAddrText(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="123 Education Street, City, Country"
           fullWidth
+          required
         />
+
         <TextField
-          label="Institute Acronym"
+          label="Institute Acronym *"
           value={instituteAcronym}
           onChange={e => setInstituteAcronym(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="UOT"
           fullWidth
+          required
+          helperText="Short form (max 10 characters recommended)"
         />
+
         <TextField
-          label="Institute Website"
+          label="Institute Website *"
           value={instituteLink}
           onChange={e => setInstituteLink(e.target.value)}
-          placeholder="https://..."
+          onKeyPress={handleKeyPress}
+          placeholder="https://www.university.edu"
           fullWidth
+          required
         />
 
-        {/* Optional: comma-separated lists. If left blank, we’ll send placeholders */}
         <TextField
-          label="Degrees (comma-separated) — optional"
+          label="Degrees (comma-separated) *"
           value={degreesCsv}
           onChange={e => setDegreesCsv(e.target.value)}
-          placeholder="BSc, MSc"
+          onKeyPress={handleKeyPress}
+          placeholder="Bachelor of Science, Master of Arts, PhD"
           fullWidth
-        />
-        <TextField
-          label="Departments (comma-separated) — optional"
-          value={departmentsCsv}
-          onChange={e => setDepartmentsCsv(e.target.value)}
-          placeholder="CSE, EEE"
-          fullWidth
+          required
+          helperText="At least one degree is required. Example: BSc, MSc, PhD"
         />
 
-        {loading ? (
-          <CircularProgress />
-        ) : (
-          <Button variant="contained" onClick={handleAddInstitute}>
-            Add Institute
+        <TextField
+          label="Departments (comma-separated) *"
+          value={departmentsCsv}
+          onChange={e => setDepartmentsCsv(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Computer Science, Electrical Engineering, Mathematics"
+          fullWidth
+          required
+          helperText="At least one department is required"
+        />
+
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Required fields marked with *
+            </Typography>
+          </Box>
+
+          <Button
+            variant="contained"
+            onClick={handleAddInstitute}
+            disabled={loading}
+            size="large"
+            sx={{ minWidth: 150 }}
+          >
+            {loading ? (
+              <>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Processing...
+              </>
+            ) : (
+              'Add Institute'
+            )}
           </Button>
-        )}
+        </Box>
       </Stack>
+
+      {/* Preview Section */}
+      {(degrees.length > 0 || departments.length > 0) && (
+        <Paper sx={{ p: 3, mt: 4, bgcolor: 'info.light' }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Preview
+          </Typography>
+          <Grid container spacing={2}>
+            {degrees.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="body2">
+                  <strong>Degrees:</strong> {degrees.join(', ')}
+                </Typography>
+              </Grid>
+            )}
+            {departments.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="body2">
+                  <strong>Departments:</strong> {departments.join(', ')}
+                </Typography>
+              </Grid>
+            )}
+          </Grid>
+        </Paper>
+      )}
 
       <Snackbar
         open={!!successMessage}
         message={successMessage}
-        autoHideDuration={5000}
-        onClose={() => setSuccess('')}
-      />
-      <Snackbar
-        open={!!errorMessage}
-        message={errorMessage}
         autoHideDuration={6000}
-        onClose={() => setError('')}
+        onClose={() => setSuccess('')}
       />
     </Box>
   );

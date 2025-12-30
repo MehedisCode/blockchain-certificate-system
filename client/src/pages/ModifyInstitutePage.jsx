@@ -1,5 +1,5 @@
 // ModifyInstitutePage.jsx
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -27,38 +27,40 @@ import INSTITUTION_ABI from '../contracts/Institution.json';
 const CONTRACT_ADDRESS = import.meta.env.VITE_INSTITUTION_CONTRACT_ADDRESS;
 
 const ModifyInstitutePage = () => {
-  // Wallet / contract
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [caller, setCaller] = useState('');
   const [contract, setContract] = useState(null);
 
-  // Institute meta
   const [instName, setInstName] = useState('');
   const [instAddr, setInstAddr] = useState('');
   const [instAcr, setInstAcr] = useState('');
   const [instLink, setInstLink] = useState('');
 
-  // Lists (rendered as simple string arrays)
-  const [degrees, setDegrees] = useState([]); // ["BSc", "MSc", ...]
-  const [departments, setDepartments] = useState([]); // ["CSE", "EEE", ...]
+  const [degrees, setDegrees] = useState([]);
+  const [departments, setDepartments] = useState([]);
 
-  // UI states
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
-  // Add inputs
   const [newDegree, setNewDegree] = useState('');
   const [newDegreeCsv, setNewDegreeCsv] = useState('');
   const [newDept, setNewDept] = useState('');
   const [newDeptCsv, setNewDeptCsv] = useState('');
 
-  // Inline edit states
   const [editDegIndex, setEditDegIndex] = useState(null);
   const [editDegName, setEditDegName] = useState('');
   const [editDeptIndex, setEditDeptIndex] = useState(null);
   const [editDeptName, setEditDeptName] = useState('');
+
+  const [edit, setEdit] = useState({
+    name: false,
+    addr: false,
+    acr: false,
+    link: false,
+  });
+  const [draft, setDraft] = useState({ name: '', addr: '', acr: '', link: '' });
 
   const csvToList = useCallback(
     csv =>
@@ -69,7 +71,6 @@ const ModifyInstitutePage = () => {
     []
   );
 
-  // Initialize provider/signer/contract
   useEffect(() => {
     (async () => {
       try {
@@ -127,18 +128,8 @@ const ModifyInstitutePage = () => {
     }
   }, [contract, caller]);
 
-  const mapDegrees = useCallback(degArray => {
-    return (degArray || []).map(d => d?.degree_name ?? d?.[0] ?? String(d));
-  }, []);
-
-  const mapDepartments = useCallback(deptArray => {
-    return (deptArray || []).map(
-      d => d?.department_name ?? d?.[0] ?? String(d)
-    );
-  }, []);
-
   const loadInstituteData = useCallback(async () => {
-    if (!contract) return;
+    if (!contract || !caller) return;
     setLoading(true);
     try {
       const registered = await checkRegistered();
@@ -148,24 +139,24 @@ const ModifyInstitutePage = () => {
         return;
       }
 
-      const res = await contract.getInstituteData();
-      const name = res?.[0] ?? res?.institute_name ?? '';
-      const addr = res?.[1] ?? res?.institute_address ?? '';
-      const acr = res?.[2] ?? res?.institute_acronym ?? '';
-      const link = res?.[3] ?? res?.institute_link ?? '';
-      const degs = mapDegrees(res?.[4]);
-      const depts = mapDepartments(res?.[5]);
+      const [name, addr, acr, link, , , , ,] =
+        await contract.getInstituteData(caller);
+      const [degNames] = await contract.getDegrees(caller);
+      const [deptNames] = await contract.getDepartments(caller);
 
       setInstName(name);
       setInstAddr(addr);
       setInstAcr(acr);
       setInstLink(link);
-      setDegrees(degs);
-      setDepartments(depts);
+      setDegrees(degNames);
+      setDepartments(deptNames);
     } catch (e) {
       console.error(e);
       const m = e?.info?.error?.message || e?.shortMessage || e?.message || '';
-      if (m.includes('Institute account does not exist')) {
+      if (
+        m.includes('Institute not active') ||
+        m.includes('Institute account does not exist')
+      ) {
         setErr('Institute account does not exist for this wallet.');
       } else {
         setErr('Failed to load institute data.');
@@ -173,15 +164,70 @@ const ModifyInstitutePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [contract, checkRegistered, mapDegrees, mapDepartments]);
+  }, [contract, caller, checkRegistered]);
 
   useEffect(() => {
-    if (contract) {
+    if (contract && caller) {
       loadInstituteData();
     }
-  }, [contract, loadInstituteData]);
+  }, [contract, caller, loadInstituteData]);
 
-  // --- Actions: Degrees ---
+  const startEdit = (key, value) => {
+    setEdit(prev => ({ ...prev, [key]: true }));
+    setDraft(prev => ({ ...prev, [key]: value ?? '' }));
+  };
+  const cancelEdit = key => setEdit(prev => ({ ...prev, [key]: false }));
+
+  const callIfExists = async (fnName, arg1, arg2) => {
+    try {
+      contract.interface.getFunction(fnName);
+      const tx = await contract[fnName](arg1, arg2);
+      await tx.wait();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const saveField = async (key, label) => {
+    const val = (draft[key] || '').trim();
+    if (!val) {
+      setErr(`${label} cannot be empty.`);
+      return;
+    }
+    setLoading(true);
+    try {
+      let ok = false;
+      if (key === 'name') {
+        const tx = await contract.updateName(caller, val);
+        await tx.wait();
+        ok = true;
+      } else if (key === 'addr') {
+        ok = await callIfExists('updateAddress', caller, val);
+      } else if (key === 'acr') {
+        ok = await callIfExists('updateAcronym', caller, val);
+      } else if (key === 'link') {
+        ok = await callIfExists('updateWebsite', caller, val);
+      }
+
+      if (!ok) {
+        setErr(
+          `Contract does not expose an updater for ${label}. Add it on-chain first.`
+        );
+        return;
+      }
+
+      setMsg(`${label} updated.`);
+      cancelEdit(key);
+      await loadInstituteData();
+    } catch (e) {
+      console.error(e);
+      setErr(e?.shortMessage || e?.message || `Failed to update ${label}.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addDegree = async () => {
     if (!newDegree.trim()) {
       setErr('Enter a degree name.');
@@ -189,7 +235,7 @@ const ModifyInstitutePage = () => {
     }
     setLoading(true);
     try {
-      const tx = await contract.addDegrees([newDegree.trim()]);
+      const tx = await contract.addDegrees(caller, [newDegree.trim()]);
       await tx.wait();
       setMsg('Degree added.');
       setNewDegree('');
@@ -210,7 +256,7 @@ const ModifyInstitutePage = () => {
     }
     setLoading(true);
     try {
-      const tx = await contract.addDegrees(list);
+      const tx = await contract.addDegrees(caller, list);
       await tx.wait();
       setMsg('Degrees added.');
       setNewDegreeCsv('');
@@ -242,7 +288,7 @@ const ModifyInstitutePage = () => {
     }
     setLoading(true);
     try {
-      const tx = await contract.updateDegree(editDegIndex, name);
+      const tx = await contract.updateDegree(caller, editDegIndex, name);
       await tx.wait();
       setMsg('Degree updated.');
       cancelEditDegree();
@@ -258,7 +304,7 @@ const ModifyInstitutePage = () => {
   const deleteDegree = async idx => {
     setLoading(true);
     try {
-      const tx = await contract.removeDegree(idx);
+      const tx = await contract.removeDegree(caller, idx);
       await tx.wait();
       setMsg('Degree removed.');
       await loadInstituteData();
@@ -274,7 +320,7 @@ const ModifyInstitutePage = () => {
     if (!confirm('Clear ALL degrees? This cannot be undone.')) return;
     setLoading(true);
     try {
-      const tx = await contract.clearDegrees();
+      const tx = await contract.clearDegrees(caller);
       await tx.wait();
       setMsg('All degrees cleared.');
       await loadInstituteData();
@@ -286,7 +332,6 @@ const ModifyInstitutePage = () => {
     }
   };
 
-  // --- Actions: Departments ---
   const addDept = async () => {
     if (!newDept.trim()) {
       setErr('Enter a department name.');
@@ -294,7 +339,7 @@ const ModifyInstitutePage = () => {
     }
     setLoading(true);
     try {
-      const tx = await contract.addDepartments([newDept.trim()]);
+      const tx = await contract.addDepartments(caller, [newDept.trim()]);
       await tx.wait();
       setMsg('Department added.');
       setNewDept('');
@@ -315,7 +360,7 @@ const ModifyInstitutePage = () => {
     }
     setLoading(true);
     try {
-      const tx = await contract.addDepartments(list);
+      const tx = await contract.addDepartments(caller, list);
       await tx.wait();
       setMsg('Departments added.');
       setNewDeptCsv('');
@@ -347,7 +392,7 @@ const ModifyInstitutePage = () => {
     }
     setLoading(true);
     try {
-      const tx = await contract.updateDepartment(editDeptIndex, name);
+      const tx = await contract.updateDepartment(caller, editDeptIndex, name);
       await tx.wait();
       setMsg('Department updated.');
       cancelEditDept();
@@ -363,7 +408,7 @@ const ModifyInstitutePage = () => {
   const deleteDept = async idx => {
     setLoading(true);
     try {
-      const tx = await contract.removeDepartment(idx);
+      const tx = await contract.removeDepartment(caller, idx);
       await tx.wait();
       setMsg('Department removed.');
       await loadInstituteData();
@@ -379,79 +424,13 @@ const ModifyInstitutePage = () => {
     if (!confirm('Clear ALL departments? This cannot be undone.')) return;
     setLoading(true);
     try {
-      const tx = await contract.clearDepartments();
+      const tx = await contract.clearDepartments(caller);
       await tx.wait();
       setMsg('All departments cleared.');
       await loadInstituteData();
     } catch (e) {
       console.error(e);
       setErr(e?.shortMessage || e?.message || 'Failed to clear departments.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // NEW state near your other useState hooks
-  const [edit, setEdit] = useState({
-    name: false,
-    addr: false,
-    acr: false,
-    link: false,
-  });
-  const [draft, setDraft] = useState({ name: '', addr: '', acr: '', link: '' });
-  const startEdit = (key, value) => {
-    setEdit(prev => ({ ...prev, [key]: true }));
-    setDraft(prev => ({ ...prev, [key]: value ?? '' }));
-  };
-  const cancelEdit = key => setEdit(prev => ({ ...prev, [key]: false }));
-
-  // Try-call a contract method if it exists in the ABI
-  const callIfExists = async (fnName, arg) => {
-    try {
-      contract.interface.getFunction(fnName); // throws if missing in ABI
-      const tx = await contract[fnName](arg);
-      await tx.wait();
-      return true;
-    } catch (e) {
-      return false;
-    }
-  };
-
-  // Save per-field
-  const saveField = async (key, label) => {
-    const val = (draft[key] || '').trim();
-    if (!val) {
-      setErr(`${label} cannot be empty.`);
-      return;
-    }
-    setLoading(true);
-    try {
-      let ok = false;
-      if (key === 'name') {
-        const tx = await contract.updateInstituteName(val);
-        await tx.wait();
-        ok = true;
-      } else if (key === 'addr') {
-        ok = await callIfExists('updateInstituteAddress', val);
-      } else if (key === 'acr') {
-        ok = await callIfExists('updateInstituteAcronym', val);
-      } else if (key === 'link') {
-        ok = await callIfExists('updateInstituteLink', val);
-      }
-
-      if (!ok) {
-        setErr(
-          `Contract does not expose an updater for ${label}. Add it on-chain first.`
-        );
-        return;
-      }
-
-      setMsg(`${label} updated.`);
-      cancelEdit(key);
-      await loadInstituteData();
-    } catch (e) {
-      console.error(e);
-      setErr(e?.shortMessage || e?.message || `Failed to update ${label}.`);
     } finally {
       setLoading(false);
     }
@@ -490,13 +469,19 @@ const ModifyInstitutePage = () => {
         </Stack>
       )}
 
-      {/* Institute Meta */}
+      {err && (
+        <Paper sx={{ p: 2, mb: 3, bgcolor: 'error.lighter' }}>
+          <Typography variant="body2" color="error">
+            {err}
+          </Typography>
+        </Paper>
+      )}
+
       <Paper sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" gutterBottom>
           Institute Info
         </Typography>
 
-        {/* Name */}
         {!edit.name ? (
           <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
             <TextField
@@ -529,7 +514,6 @@ const ModifyInstitutePage = () => {
           </Stack>
         )}
 
-        {/* Address */}
         {!edit.addr ? (
           <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
             <TextField
@@ -562,7 +546,6 @@ const ModifyInstitutePage = () => {
           </Stack>
         )}
 
-        {/* Acronym */}
         {!edit.acr ? (
           <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
             <TextField
@@ -595,7 +578,6 @@ const ModifyInstitutePage = () => {
           </Stack>
         )}
 
-        {/* Website */}
         {!edit.link ? (
           <Stack direction="row" spacing={2} alignItems="center">
             <TextField
@@ -625,7 +607,6 @@ const ModifyInstitutePage = () => {
         )}
       </Paper>
 
-      {/* Degrees Section */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack
           direction="row"
@@ -739,7 +720,6 @@ const ModifyInstitutePage = () => {
         </Stack>
       </Paper>
 
-      {/* Departments Section */}
       <Paper sx={{ p: 2 }}>
         <Stack
           direction="row"
@@ -846,7 +826,6 @@ const ModifyInstitutePage = () => {
         </Stack>
       </Paper>
 
-      {/* Snackbars */}
       <Snackbar
         open={!!msg}
         message={msg}

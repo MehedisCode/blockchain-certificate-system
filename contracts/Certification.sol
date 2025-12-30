@@ -4,191 +4,448 @@ pragma solidity ^0.8.30;
 import "./Institution.sol";
 
 contract Certification {
-    // State Variables
     address public owner;
     Institution public institution;
-
-    // Mappings
-    mapping(bytes32 => Certificate) private certificates;
-
-    // Events
-    event certificateGenerated(bytes32 _certificateId);
-    event certificateRevoked(bytes32 _certificateId);
-
+    
+    // Use double mapping to prevent ID collisions
+    mapping(address => mapping(bytes32 => Certificate)) private certificates;
+    mapping(address => mapping(bytes32 => CertificateDetails)) private certificateDetails;
+    mapping(address => mapping(bytes32 => string)) private certificateIpfsHashes;
+    
+    // Track certificate IDs per institute
+    mapping(address => bytes32[]) private instituteCertificateIds;
+    
+    // Events (consistent naming)
+    event CertificateGenerated(bytes32 indexed certificateId, address indexed institute, string candidateId);
+    event CertificateRevoked(bytes32 indexed certificateId);
+    event CertificateUpdated(bytes32 indexed certificateId, string field);
+    event CertificateIpfsUpdated(bytes32 indexed certificateId, string ipfsHash);
+    
+    struct Certificate {
+        string candidateId;
+        string candidateName;
+        string degreeName;
+        string departmentName;
+        string instituteAcronym;
+        string issueDate;
+        uint256 timestamp;
+        bool revoked;
+        bool hasIpfs;
+    }
+    
+    struct CertificateDetails {
+        string fatherName;
+        string motherName;
+        string cgpa;
+        string session;
+        string instituteName;
+        string instituteAddress;
+        string instituteLink;
+    }
+    
     constructor(Institution _institution) {
         owner = msg.sender;
         institution = _institution;
     }
-
-    struct Certificate {
-        // Individual Info
-        string candidate_name;
-        string candidate_id;
-        string father_name;
-        string mother_name;
-        string degree_name;
-        string department_name;
-        string cgpa;
-        string session;
-        string creation_date;
-        // Institute Info
-        string institute_name;
-        string institute_address;
-        string institute_acronym;
-        string institute_link;
-        // Revocation status
-        bool revoked;
+    
+    modifier onlyInstitute() {
+        require(
+            institution.checkInstitutePermission(msg.sender),
+            "Not a registered institute"
+        );
+        _;
     }
-
-    function stringToBytes32(
-        string memory source
-    ) private pure returns (bytes32 result) {
-        bytes memory tempEmptyStringTest = bytes(source);
-        if (tempEmptyStringTest.length == 0) {
-            return 0x0;
-        }
-        assembly {
-            result := mload(add(source, 32))
-        }
+    
+    modifier onlyIssuer(bytes32 certificateId) {
+        require(
+            bytes(certificates[msg.sender][certificateId].candidateId).length > 0,
+            "Certificate does not exist"
+        );
+        _;
     }
-
+    
+    modifier validCertificateId(string memory _candidateId) {
+        require(bytes(_candidateId).length >= 3, "Candidate ID too short");
+        require(bytes(_candidateId).length <= 50, "Candidate ID too long");
+        _;
+    }
+    
+    // Generate unique certificate ID with institute prefix
+    function generateCertificateId(
+        address instituteAddress,
+        string memory candidateId
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(
+            instituteAddress,
+            candidateId
+        ));
+    }
+    
     function generateCertificate(
-        string memory _id,
-        string memory _candidate_name,
-        string memory _candidate_id,
-        string memory _father_name,
-        string memory _mother_name,
-        uint256 _degree_index,
-        uint256 _departments_index,
+        string memory _candidateId,
+        string memory _candidateName,
+        string memory _fatherName,
+        string memory _motherName,
+        string memory _degreeName,
+        string memory _departmentName,
         string memory _cgpa,
         string memory _session,
-        string memory _creation_date
-    ) public {
+        string memory _issueDate,
+        string memory _ipfsHash
+    ) external onlyInstitute validCertificateId(_candidateId) {
+        bytes32 certificateId = generateCertificateId(msg.sender, _candidateId);
+        
         require(
-            institution.checkInstitutePermission(msg.sender) == true,
-            "Institute account does not exist"
+            bytes(certificates[msg.sender][certificateId].candidateId).length == 0,
+            "Certificate already exists"
         );
-        bytes32 byte_id = stringToBytes32(_id);
-        // require(certificates[byte_id].creation_date == 0, "Certificate with given id already exists");
-        bytes memory tempEmptyStringNameTest = bytes(
-            certificates[byte_id].creation_date
-        );
-
-        require(
-            tempEmptyStringNameTest.length == 0,
-            "Certificate with given id already exists"
-        );
-
+        
+        // Validate CGPA format
+        require(_isValidCgpa(_cgpa), "Invalid CGPA format");
+        
+        // Get institute info
         (
-            string memory _institute_name,
-            string memory _institute_address,
-            string memory _institute_acronym,
-            string memory _institute_link,
-            Institution.Degree[] memory _institute_degree,
-            Institution.Department[] memory _institute_departments
+            string memory instituteName,
+            string memory instituteAddress,
+            string memory instituteAcronym,
+            string memory instituteLink,
+            bool isActive,
+            ,
+            ,
+            uint256 degreesCount,
+            uint256 departmentsCount
         ) = institution.getInstituteData(msg.sender);
-
-        require(
-            _degree_index >= 0 && _degree_index < _institute_degree.length,
-            "Invalid Degree index"
-        );
-        require(
-            _departments_index >= 0 &&
-                _departments_index < _institute_departments.length,
-            "Invalid Department index"
-        );
-
-        string memory _degree_name = _institute_degree[_degree_index]
-            .degree_name;
-        string memory _department_name = _institute_departments[
-            _departments_index
-        ].department_name;
-
-        bool revocation_status = false;
-
-        certificates[byte_id] = Certificate(
-            _candidate_name,
-            _candidate_id,
-            _father_name,
-            _mother_name,
-            _degree_name,
-            _department_name,
-            _cgpa,
-            _session,
-            _creation_date,
-            _institute_name,
-            _institute_address,
-            _institute_acronym,
-            _institute_link,
-            revocation_status
-        );
-        emit certificateGenerated(byte_id);
+        
+        require(isActive, "Institute is not active");
+        require(degreesCount > 0, "Institute has no degrees");
+        require(departmentsCount > 0, "Institute has no departments");
+        
+        // Store certificate
+        certificates[msg.sender][certificateId] = Certificate({
+            candidateId: _candidateId,
+            candidateName: _candidateName,
+            degreeName: _degreeName,
+            departmentName: _departmentName,
+            instituteAcronym: instituteAcronym,
+            issueDate: _issueDate,
+            timestamp: block.timestamp,
+            revoked: false,
+            hasIpfs: bytes(_ipfsHash).length > 0
+        });
+        
+        // Store details
+        certificateDetails[msg.sender][certificateId] = CertificateDetails({
+            fatherName: _fatherName,
+            motherName: _motherName,
+            cgpa: _cgpa,
+            session: _session,
+            instituteName: instituteName,
+            instituteAddress: instituteAddress,
+            instituteLink: instituteLink
+        });
+        
+        // Store IPFS hash
+        if (bytes(_ipfsHash).length > 0) {
+            certificateIpfsHashes[msg.sender][certificateId] = _ipfsHash;
+        }
+        
+        // Track certificate ID
+        instituteCertificateIds[msg.sender].push(certificateId);
+        
+        emit CertificateGenerated(certificateId, msg.sender, _candidateId);
     }
-
-    function getData(
-        string memory _id
-    )
-        public
-        view
-        returns (
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            bool
-        )
+    
+    // New function: Generate multiple certificates
+    function batchGenerateCertificates(
+        string[] memory _candidateIds,
+        string[] memory _candidateNames,
+        string[] memory _fatherNames,
+        string[] memory _motherNames,
+        string[] memory _degreeNames,
+        string[] memory _departmentNames,
+        string[] memory _cgpas,
+        string[] memory _sessions,
+        string[] memory _issueDates
+    ) external onlyInstitute {
+        require(_candidateIds.length <= 20, "Batch too large");
+        require(_candidateIds.length == _candidateNames.length, "Arrays length mismatch");
+        
+        for (uint256 i = 0; i < _candidateIds.length; i++) {
+            bytes32 certificateId = generateCertificateId(msg.sender, _candidateIds[i]);
+            
+            // Skip if already exists
+            if (bytes(certificates[msg.sender][certificateId].candidateId).length == 0) {
+                _generateSingleCertificate(
+                    _candidateIds[i],
+                    _candidateNames[i],
+                    _fatherNames[i],
+                    _motherNames[i],
+                    _degreeNames[i],
+                    _departmentNames[i],
+                    _cgpas[i],
+                    _sessions[i],
+                    _issueDates[i],
+                    ""
+                );
+            }
+        }
+    }
+    
+    function getCertificate(
+        address instituteAddress,
+        string memory _candidateId
+    ) external view returns (
+        Certificate memory cert,
+        CertificateDetails memory details,
+        string memory ipfsHash,
+        bool exists
+    ) {
+        bytes32 certificateId = generateCertificateId(instituteAddress, _candidateId);
+        
+        cert = certificates[instituteAddress][certificateId];
+        details = certificateDetails[instituteAddress][certificateId];
+        ipfsHash = certificateIpfsHashes[instituteAddress][certificateId];
+        exists = bytes(cert.candidateId).length > 0;
+    }
+    
+    function verifyCertificate(
+        address instituteAddress,
+        string memory _candidateId
+    ) external view returns (
+        bool exists,
+        bool valid,
+        bool revoked,
+        bool hasIpfs,
+        string memory instituteAcronym
+    ) {
+        bytes32 certificateId = generateCertificateId(instituteAddress, _candidateId);
+        Certificate storage cert = certificates[instituteAddress][certificateId];
+        
+        exists = bytes(cert.candidateId).length > 0;
+        if (exists) {
+            revoked = cert.revoked;
+            valid = !revoked;
+            hasIpfs = cert.hasIpfs;
+            instituteAcronym = cert.instituteAcronym;
+        }
+    }
+    
+    function revokeCertificate(
+        string memory _candidateId
+    ) external onlyInstitute onlyIssuer(generateCertificateId(msg.sender, _candidateId)) {
+        bytes32 certificateId = generateCertificateId(msg.sender, _candidateId);
+        Certificate storage cert = certificates[msg.sender][certificateId];
+        
+        require(!cert.revoked, "Certificate already revoked");
+        cert.revoked = true;
+        
+        emit CertificateRevoked(certificateId);
+    }
+    
+    // Update IPFS hash
+    function updateCertificateIpfs(
+        string memory _candidateId,
+        string memory _ipfsHash
+    ) external onlyInstitute onlyIssuer(generateCertificateId(msg.sender, _candidateId)) {
+        bytes32 certificateId = generateCertificateId(msg.sender, _candidateId);
+        Certificate storage cert = certificates[msg.sender][certificateId];
+        
+        require(!cert.revoked, "Certificate is revoked");
+        require(bytes(_ipfsHash).length > 0, "IPFS hash cannot be empty");
+        
+        certificateIpfsHashes[msg.sender][certificateId] = _ipfsHash;
+        cert.hasIpfs = true;
+        
+        emit CertificateIpfsUpdated(certificateId, _ipfsHash);
+    }
+    
+    // Get all certificate IDs for an institute
+    function getInstituteCertificates(
+        address instituteAddress,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (bytes32[] memory, uint256 total) {
+        bytes32[] storage allIds = instituteCertificateIds[instituteAddress];
+        total = allIds.length;
+        
+        if (offset >= total) {
+            return (new bytes32[](0), total);
+        }
+        
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        
+        bytes32[] memory result = new bytes32[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            result[i - offset] = allIds[i];
+        }
+        
+        return (result, total);
+    }
+    
+    // Get certificate by ID
+    function getCertificateById(
+        address instituteAddress,
+        bytes32 certificateId
+    ) external view returns (
+        Certificate memory cert,
+        CertificateDetails memory details,
+        string memory ipfsHash,
+        bool exists
+    ) {
+        cert = certificates[instituteAddress][certificateId];
+        details = certificateDetails[instituteAddress][certificateId];
+        ipfsHash = certificateIpfsHashes[instituteAddress][certificateId];
+        exists = bytes(cert.candidateId).length > 0;
+    }
+    
+    // Get total certificates count
+    function getTotalCertificatesCount(address instituteAddress) 
+        external 
+        view 
+        returns (uint256) 
     {
-        bytes32 byte_id = stringToBytes32(_id);
-        Certificate memory temp = certificates[byte_id];
-        // require(certificates[byte_id].creation_date != 0, "Certificate id does not exist!");
-        bytes memory tempEmptyStringNameTest = bytes(
-            certificates[byte_id].creation_date
-        );
-        require(
-            tempEmptyStringNameTest.length != 0,
-            "Certificate id does not exist"
-        );
-        return (
-            temp.candidate_name,
-            temp.candidate_id,
-            temp.father_name,
-            temp.mother_name,
-            temp.degree_name,
-            temp.department_name,
-            temp.cgpa,
-            temp.session,
-            temp.creation_date,
-            temp.institute_name,
-            temp.institute_address,
-            temp.institute_acronym,
-            temp.institute_link,
-            temp.revoked
-        );
+        return instituteCertificateIds[instituteAddress].length;
     }
-
-    function revokeCertificate(string memory _id) public {
-        require(
-            institution.checkInstitutePermission(msg.sender) == true,
-            "Institute account does not exist"
-        );
-        bytes32 byte_id = stringToBytes32(_id);
-        bytes memory tempEmptyStringNameTest = bytes(
-            certificates[byte_id].creation_date
-        );
-        require(
-            tempEmptyStringNameTest.length != 0,
-            "Certificate id does not exist"
-        );
-        certificates[byte_id].revoked = true;
-        emit certificateRevoked(byte_id);
+    
+    // Search certificates by candidate name (partial match)
+    function searchCertificates(
+        address instituteAddress,
+        string memory query,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (bytes32[] memory, uint256 total) {
+        bytes32[] storage allIds = instituteCertificateIds[instituteAddress];
+        bytes32[] memory result = new bytes32[](limit);
+        
+        uint256 count = 0;
+        uint256 totalMatches = 0;
+        
+        // First pass: count matches
+        for (uint256 i = 0; i < allIds.length; i++) {
+            if (_contains(certificates[instituteAddress][allIds[i]].candidateName, query)) {
+                totalMatches++;
+            }
+        }
+        
+        // Second pass: collect matches
+        for (uint256 i = offset; i < allIds.length && count < limit; i++) {
+            if (_contains(certificates[instituteAddress][allIds[i]].candidateName, query)) {
+                result[count] = allIds[i];
+                count++;
+            }
+        }
+        
+        // Resize array
+        bytes32[] memory finalResult = new bytes32[](count);
+        for (uint256 i = 0; i < count; i++) {
+            finalResult[i] = result[i];
+        }
+        
+        return (finalResult, totalMatches);
+    }
+    
+    // Internal helper functions
+    function _generateSingleCertificate(
+        string memory _candidateId,
+        string memory _candidateName,
+        string memory _fatherName,
+        string memory _motherName,
+        string memory _degreeName,
+        string memory _departmentName,
+        string memory _cgpa,
+        string memory _session,
+        string memory _issueDate,
+        string memory _ipfsHash
+    ) internal {
+        bytes32 certificateId = generateCertificateId(msg.sender, _candidateId);
+        
+        // Get institute data
+        (
+            string memory instituteName,
+            string memory instituteAddress,
+            string memory instituteAcronym,
+            string memory instituteLink,
+            bool isActive,
+            ,
+            ,
+            ,
+        ) = institution.getInstituteData(msg.sender);
+        
+        require(isActive, "Institute is not active");
+        
+        certificates[msg.sender][certificateId] = Certificate({
+            candidateId: _candidateId,
+            candidateName: _candidateName,
+            degreeName: _degreeName,
+            departmentName: _departmentName,
+            instituteAcronym: instituteAcronym,
+            issueDate: _issueDate,
+            timestamp: block.timestamp,
+            revoked: false,
+            hasIpfs: bytes(_ipfsHash).length > 0
+        });
+        
+        certificateDetails[msg.sender][certificateId] = CertificateDetails({
+            fatherName: _fatherName,
+            motherName: _motherName,
+            cgpa: _cgpa,
+            session: _session,
+            instituteName: instituteName,
+            instituteAddress: instituteAddress,
+            instituteLink: instituteLink
+        });
+        
+        if (bytes(_ipfsHash).length > 0) {
+            certificateIpfsHashes[msg.sender][certificateId] = _ipfsHash;
+        }
+        
+        instituteCertificateIds[msg.sender].push(certificateId);
+        
+        emit CertificateGenerated(certificateId, msg.sender, _candidateId);
+    }
+    
+    function _isValidCgpa(string memory cgpa) internal pure returns (bool) {
+        bytes memory b = bytes(cgpa);
+        if (b.length == 0 || b.length > 5) return false;
+        
+        uint256 dotCount = 0;
+        for (uint256 i = 0; i < b.length; i++) {
+            bytes1 char = b[i];
+            if (char >= 0x30 && char <= 0x39) {
+                // 0-9
+            } else if (char == 0x2E) {
+                // dot
+                dotCount++;
+                if (dotCount > 1) return false;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    function _contains(string memory str, string memory substr) 
+        internal 
+        pure 
+        returns (bool) 
+    {
+        bytes memory strBytes = bytes(str);
+        bytes memory subBytes = bytes(substr);
+        
+        if (subBytes.length > strBytes.length) return false;
+        if (subBytes.length == 0) return true;
+        
+        for (uint256 i = 0; i <= strBytes.length - subBytes.length; i++) {
+            bool found = true;
+            for (uint256 j = 0; j < subBytes.length; j++) {
+                if (strBytes[i + j] != subBytes[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) return true;
+        }
+        return false;
     }
 }
