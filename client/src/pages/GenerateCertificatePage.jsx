@@ -15,11 +15,31 @@ import {
   IconButton,
   Button,
   Alert,
+  Card,
+  CardContent,
+  CardActions,
+  Chip,
+  Divider,
+  Tooltip,
+  Stack,
+  Avatar,
+  LinearProgress,
+  Container,
 } from '@mui/material';
 import FileCopyIcon from '@mui/icons-material/FileCopyOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNewOutlined';
 import LoopIcon from '@mui/icons-material/LoopOutlined';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import LaunchIcon from '@mui/icons-material/Launch';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import PersonIcon from '@mui/icons-material/Person';
+import SchoolIcon from '@mui/icons-material/School';
+import BadgeIcon from '@mui/icons-material/Badge';
+import DescriptionIcon from '@mui/icons-material/Description';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { ethers } from 'ethers';
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx-js-style';
@@ -53,6 +73,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
 
   const [certificateHistory, setCertificateHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [copiedCertId, setCopiedCertId] = useState(null);
 
   // Search states for history
   const [searchTerm, setSearchTerm] = useState('');
@@ -309,6 +330,7 @@ const GenerateCertificatePage = ({ userAddress }) => {
 
   const fetchCertificateHistory = async () => {
     try {
+      setHistoryLoading(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const instituteAddress = (await signer.getAddress()).toLowerCase();
@@ -324,6 +346,8 @@ const GenerateCertificatePage = ({ userAddress }) => {
     } catch (err) {
       console.error('Error fetching certificate history:', err);
       setFileError('Failed to fetch certificate history');
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -340,6 +364,58 @@ const GenerateCertificatePage = ({ userAddress }) => {
     setSearchTerm('');
     setSearchField('all');
     setAppliedSearch({ term: '', field: 'all' });
+  };
+
+  // Format date
+  const formatDate = dateString => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Copy certificate ID to clipboard
+  const copyCertificateId = async certId => {
+    try {
+      await navigator.clipboard.writeText(certId);
+      setCopiedCertId(certId);
+
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setCopiedCertId(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Open certificate in new tab
+  const openCertificate = certId => {
+    window.open(`/certificate/${certId}`, '_blank');
+  };
+
+  // Get initials from name
+  const getInitials = name => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
+  // Truncate text
+  const truncateText = (text, maxLength) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   };
 
   // Filtered history based on applied search
@@ -384,353 +460,725 @@ const GenerateCertificatePage = ({ userAddress }) => {
   useEffect(() => {
     if (tabValue === 1) {
       fetchCertificateHistory();
-      // reset applied search when entering history tab (optional)
-      // setAppliedSearch({ term: '', field: 'all' });
     }
   }, [tabValue]);
 
   return (
-    <Grid container justifyContent="center">
-      <Grid item xs={12}>
-        <Typography variant="h4" align="center" sx={{ mt: 4 }} color="primary">
-          Welcome, <b>{instituteName}</b>
-        </Typography>
-        <Typography variant="subtitle1" align="center" sx={{ mb: 4 }}>
-          You may create a certificate on the Credentials Ethereum Blockchain
-          below
-        </Typography>
+    <Container maxWidth="xl">
+      <Grid container justifyContent="center">
+        <Grid item xs={12}>
+          <Typography
+            variant="h4"
+            align="center"
+            sx={{ mt: 4 }}
+            color="primary"
+          >
+            Welcome, <b>{instituteName}</b>
+          </Typography>
+          <Typography variant="subtitle1" align="center" sx={{ mb: 4 }}>
+            You may create a certificate on the Credentials Ethereum Blockchain
+            below
+          </Typography>
 
-        <Paper sx={{ p: 3, mb: 6 }}>
-          <AppBar position="static" color="white">
-            <Tabs
-              value={tabValue}
-              onChange={handleTabChange}
-              variant="fullWidth"
-            >
-              <Tab label="Generate Certificate" value={0} />
-              <Tab label="Certificate History" value={1} />
-            </Tabs>
-          </AppBar>
+          <Paper sx={{ p: 3, mb: 6, borderRadius: 2 }}>
+            <AppBar position="static" color="white" elevation={1}>
+              <Tabs
+                value={tabValue}
+                onChange={handleTabChange}
+                variant="fullWidth"
+                indicatorColor="primary"
+                textColor="primary"
+              >
+                <Tab label="Generate Certificate" value={0} />
+                <Tab label="Certificate History" value={1} />
+              </Tabs>
+            </AppBar>
 
-          {/* TAB 0: Generate */}
-          {tabValue === 0 && (
-            <Box sx={{ mt: 3 }}>
-              <div className="container">
-                <div className="section certificate-details">
-                  <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-                    <Typography variant="h6" color="primary" gutterBottom>
-                      Certificate Details
-                    </Typography>
+            {/* TAB 0: Generate */}
+            {tabValue === 0 && (
+              <Box sx={{ mt: 3 }}>
+                <div className="container">
+                  <div className="section certificate-details">
+                    <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+                      <Typography variant="h6" color="primary" gutterBottom>
+                        Certificate Details
+                      </Typography>
 
-                    <TextField
-                      label="Student Name"
-                      name="name"
-                      value={form.name}
-                      onChange={handleChange}
-                      fullWidth
-                      margin="normal"
-                    />
-
-                    <TextField
-                      label="Student ID"
-                      name="id"
-                      value={form.id}
-                      onChange={handleChange}
-                      fullWidth
-                      margin="normal"
-                    />
-
-                    <FormControl fullWidth margin="normal">
-                      <InputLabel>Degree</InputLabel>
-                      <Select
-                        name="degree"
-                        value={form.degree}
+                      <TextField
+                        label="Student Name"
+                        name="name"
+                        value={form.name}
                         onChange={handleChange}
-                      >
-                        {degrees.map((d, i) => (
-                          <MenuItem value={d.degree_name || d} key={i}>
-                            {d.degree_name || d}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth margin="normal">
-                      <InputLabel>Department</InputLabel>
-                      <Select
-                        name="department"
-                        value={form.department}
-                        onChange={handleChange}
-                      >
-                        {departments.map((d, i) => (
-                          <MenuItem value={d.department_name || d} key={i}>
-                            {d.department_name || d}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    <TextField
-                      label="Father's Name"
-                      name="father"
-                      value={form.father}
-                      onChange={handleChange}
-                      fullWidth
-                      margin="normal"
-                    />
-
-                    <TextField
-                      label="Mother's Name"
-                      name="mother"
-                      value={form.mother}
-                      onChange={handleChange}
-                      fullWidth
-                      margin="normal"
-                    />
-
-                    <TextField
-                      label="Session"
-                      name="session"
-                      value={form.session}
-                      onChange={handleChange}
-                      fullWidth
-                      margin="normal"
-                    />
-
-                    <TextField
-                      label="CGPA"
-                      name="cgpa"
-                      value={form.cgpa}
-                      onChange={handleChange}
-                      fullWidth
-                      margin="normal"
-                    />
-                  </Paper>
-                </div>
-
-                <div className="section from-excel">
-                  <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-                    <Typography gutterBottom sx={{ mb: 2 }}>
-                      From Excel File:
-                    </Typography>
-
-                    <Box sx={{ mb: 2 }}>
-                      <Button
-                        variant="outlined"
-                        startIcon={<UploadFileIcon />}
-                        onClick={handleFileButtonClick}
                         fullWidth
-                      >
-                        Choose Excel File
-                      </Button>
-
-                      <input
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={handleFileUpload}
-                        ref={fileInputRef}
-                        style={{ display: 'none' }}
+                        margin="normal"
                       />
 
-                      {fileError && (
-                        <Alert severity="error" sx={{ mt: 1 }}>
-                          {fileError}
-                        </Alert>
-                      )}
-                    </Box>
+                      <TextField
+                        label="Student ID"
+                        name="id"
+                        value={form.id}
+                        onChange={handleChange}
+                        fullWidth
+                        margin="normal"
+                      />
 
-                    <Typography sx={{ fontSize: '12px' }} gutterBottom>
-                      Enter Student ID to extract details from uploaded excel
-                    </Typography>
+                      <FormControl fullWidth margin="normal">
+                        <InputLabel>Degree</InputLabel>
+                        <Select
+                          name="degree"
+                          value={form.degree}
+                          onChange={handleChange}
+                        >
+                          {degrees.map((d, i) => (
+                            <MenuItem value={d.degree_name || d} key={i}>
+                              {d.degree_name || d}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
 
-                    <TextField
-                      label="Student ID"
-                      name="id"
-                      value={form.id}
-                      onChange={handleChange}
-                      fullWidth
-                      margin="normal"
-                      helperText="Enter ID to auto-fill from uploaded Excel"
-                    />
-                  </Paper>
+                      <FormControl fullWidth margin="normal">
+                        <InputLabel>Department</InputLabel>
+                        <Select
+                          name="department"
+                          value={form.department}
+                          onChange={handleChange}
+                        >
+                          {departments.map((d, i) => (
+                            <MenuItem value={d.department_name || d} key={i}>
+                              {d.department_name || d}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      <TextField
+                        label="Father's Name"
+                        name="father"
+                        value={form.father}
+                        onChange={handleChange}
+                        fullWidth
+                        margin="normal"
+                      />
+
+                      <TextField
+                        label="Mother's Name"
+                        name="mother"
+                        value={form.mother}
+                        onChange={handleChange}
+                        fullWidth
+                        margin="normal"
+                      />
+
+                      <TextField
+                        label="Session"
+                        name="session"
+                        value={form.session}
+                        onChange={handleChange}
+                        fullWidth
+                        margin="normal"
+                      />
+
+                      <TextField
+                        label="CGPA"
+                        name="cgpa"
+                        value={form.cgpa}
+                        onChange={handleChange}
+                        fullWidth
+                        margin="normal"
+                      />
+                    </Paper>
+                  </div>
+
+                  <div className="section from-excel">
+                    <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+                      <Typography gutterBottom sx={{ mb: 2 }}>
+                        From Excel File:
+                      </Typography>
+
+                      <Box sx={{ mb: 2 }}>
+                        <Button
+                          variant="outlined"
+                          startIcon={<UploadFileIcon />}
+                          onClick={handleFileButtonClick}
+                          fullWidth
+                        >
+                          Choose Excel File
+                        </Button>
+
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={handleFileUpload}
+                          ref={fileInputRef}
+                          style={{ display: 'none' }}
+                        />
+
+                        {fileError && (
+                          <Alert severity="error" sx={{ mt: 1 }}>
+                            {fileError}
+                          </Alert>
+                        )}
+                      </Box>
+
+                      <Typography sx={{ fontSize: '12px' }} gutterBottom>
+                        Enter Student ID to extract details from uploaded excel
+                      </Typography>
+
+                      <TextField
+                        label="Student ID"
+                        name="id"
+                        value={form.id}
+                        onChange={handleChange}
+                        fullWidth
+                        margin="normal"
+                        helperText="Enter ID to auto-fill from uploaded Excel"
+                      />
+                    </Paper>
+                  </div>
                 </div>
-              </div>
 
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  mt: 4,
-                  gap: 2,
-                }}
-              >
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={handleGenerateCertificate}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    mt: 4,
+                    gap: 2,
+                  }}
                 >
-                  Generate Certificate
-                </Button>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={handleGenerateCertificate}
+                    sx={{ px: 4 }}
+                  >
+                    Generate Certificate
+                  </Button>
+
+                  {submitSuccess && (
+                    <IconButton
+                      color="primary"
+                      onClick={() => setSubmitSuccess(false)}
+                    >
+                      <LoopIcon />
+                    </IconButton>
+                  )}
+                </Box>
 
                 {submitSuccess && (
-                  <IconButton
-                    color="primary"
-                    onClick={() => setSubmitSuccess(false)}
-                  >
-                    <LoopIcon />
-                  </IconButton>
+                  <Box sx={{ textAlign: 'center', mt: 3 }}>
+                    <Alert severity="success" icon={<CheckCircleIcon />}>
+                      Certificate generated successfully!
+                      <br />
+                      ID: <strong>{certificateId}</strong>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          navigator.clipboard.writeText(certificateId)
+                        }
+                      >
+                        <FileCopyIcon fontSize="small" />
+                      </IconButton>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        endIcon={<OpenInNewIcon />}
+                        onClick={() =>
+                          window.open(`/certificate/${certificateId}`, '_blank')
+                        }
+                        sx={{ ml: 1 }}
+                      >
+                        View Certificate
+                      </Button>
+                    </Alert>
+                  </Box>
                 )}
               </Box>
+            )}
 
-              {submitSuccess && (
-                <Box sx={{ textAlign: 'center', mt: 3 }}>
-                  <Alert severity="success">
-                    Certificate generated successfully!
-                    <br />
-                    ID: <strong>{certificateId}</strong>
-                    <IconButton
-                      size="small"
-                      onClick={() =>
-                        navigator.clipboard.writeText(certificateId)
-                      }
-                    >
-                      <FileCopyIcon fontSize="small" />
-                    </IconButton>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      endIcon={<OpenInNewIcon />}
-                      onClick={() =>
-                        window.open(`/certificate/${certificateId}`, '_blank')
-                      }
-                      sx={{ ml: 1 }}
-                    >
-                      View Certificate
-                    </Button>
-                  </Alert>
-                </Box>
-              )}
-            </Box>
-          )}
-
-          {/* TAB 1: Certificate History */}
-          {tabValue === 1 && (
-            <Box sx={{ mt: 3 }}>
-              {/* Search bar */}
-              <Paper elevation={2} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} md={3}>
-                    <FormControl fullWidth>
-                      <InputLabel>Search By</InputLabel>
-                      <Select
-                        value={searchField}
-                        label="Search By"
-                        onChange={e => setSearchField(e.target.value)}
-                      >
-                        <MenuItem value="all">All</MenuItem>
-                        <MenuItem value="certId">Certificate ID</MenuItem>
-                        <MenuItem value="studentId">Student ID</MenuItem>
-                        <MenuItem value="name">Name</MenuItem>
-                        <MenuItem value="degree">Degree</MenuItem>
-                        <MenuItem value="department">Department</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      label="Search"
-                      value={searchTerm}
-                      onChange={e => setSearchTerm(e.target.value)}
-                      fullWidth
-                      placeholder="Type keyword (e.g., certId, studentId, name...)"
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} md={3}>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button
-                        variant="contained"
-                        fullWidth
-                        onClick={handleSearch}
-                      >
-                        Search
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        fullWidth
-                        onClick={handleClearSearch}
-                      >
-                        Clear
-                      </Button>
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Showing: <b>{filteredHistory.length}</b> result(s)
-                  </Typography>
-                  {appliedSearch.term ? (
-                    <Typography variant="caption" color="text.secondary">
-                      Filter: <b>{appliedSearch.field}</b> contains "
-                      <b>{appliedSearch.term}</b>"
-                    </Typography>
-                  ) : null}
-                </Box>
-              </Paper>
-
-              {/* Errors */}
-              {fileError && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {fileError}
-                </Alert>
-              )}
-
-              {/* List */}
-              {historyLoading ? (
-                <Typography>Loading history...</Typography>
-              ) : (
-                <Grid container spacing={2}>
-                  {filteredHistory.length > 0 ? (
-                    filteredHistory.map((certificate, index) => (
-                      <Grid item xs={12} md={6} key={certificate._id || index}>
-                        <Paper sx={{ p: 3 }}>
-                          <Typography variant="body1">
-                            Certificate ID: {certificate.certId}
-                          </Typography>
-                          <Typography variant="body2">
-                            Student ID: {certificate.studentId}
-                          </Typography>
-                          <Typography variant="body2">
-                            Name: {certificate.name}
-                          </Typography>
-                          <Typography variant="body2">
-                            Degree: {certificate.degree}
-                          </Typography>
-                          <Typography variant="body2">
-                            Department: {certificate.department}
-                          </Typography>
-                          <Typography variant="body2">
-                            Date: {certificate.createdAt}
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                    ))
-                  ) : (
-                    <Grid item xs={12}>
-                      <Typography variant="body2" color="textSecondary">
-                        No certificates found.
-                      </Typography>
+            {/* TAB 1: Certificate History */}
+            {tabValue === 1 && (
+              <Box sx={{ mt: 3 }}>
+                {/* Search Bar */}
+                <Paper
+                  elevation={1}
+                  sx={{
+                    p: 3,
+                    mb: 3,
+                    borderRadius: 2,
+                    backgroundColor: 'grey.50',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} md={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Search By</InputLabel>
+                        <Select
+                          value={searchField}
+                          label="Search By"
+                          onChange={e => setSearchField(e.target.value)}
+                          sx={{
+                            backgroundColor: 'white',
+                            '& .MuiSelect-select': {
+                              display: 'flex',
+                              alignItems: 'center',
+                            },
+                          }}
+                        >
+                          <MenuItem value="all">All Fields</MenuItem>
+                          <MenuItem value="certId">Certificate ID</MenuItem>
+                          <MenuItem value="studentId">Student ID</MenuItem>
+                          <MenuItem value="name">Student Name</MenuItem>
+                          <MenuItem value="degree">Degree</MenuItem>
+                          <MenuItem value="department">Department</MenuItem>
+                        </Select>
+                      </FormControl>
                     </Grid>
-                  )}
-                </Grid>
-              )}
-            </Box>
-          )}
-        </Paper>
+
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Search certificates..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        fullWidth
+                        size="small"
+                        placeholder="Type keyword to search..."
+                        sx={{
+                          backgroundColor: 'white',
+                        }}
+                        InputProps={{
+                          startAdornment: (
+                            <SearchIcon
+                              sx={{ mr: 1, color: 'action.active' }}
+                            />
+                          ),
+                        }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12} md={3}>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          onClick={handleSearch}
+                          startIcon={<SearchIcon />}
+                          sx={{
+                            backgroundColor: 'primary.main',
+                            '&:hover': {
+                              backgroundColor: 'primary.dark',
+                            },
+                          }}
+                        >
+                          Search
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          onClick={handleClearSearch}
+                          sx={{ minWidth: 'auto' }}
+                        >
+                          <ClearIcon />
+                        </Button>
+                      </Stack>
+                    </Grid>
+                  </Grid>
+
+                  <Box
+                    sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}
+                  >
+                    <Chip
+                      label={`Total: ${certificateHistory.length}`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ backgroundColor: 'white' }}
+                    />
+                    {appliedSearch.term && (
+                      <Chip
+                        label={`Found: ${filteredHistory.length}`}
+                        size="small"
+                        color="success"
+                        variant="outlined"
+                        sx={{ backgroundColor: 'white' }}
+                      />
+                    )}
+                    {appliedSearch.term && (
+                      <Chip
+                        label={`Searching: ${appliedSearch.field} for "${appliedSearch.term}"`}
+                        size="small"
+                        onDelete={handleClearSearch}
+                        sx={{ backgroundColor: 'white' }}
+                      />
+                    )}
+                  </Box>
+                </Paper>
+
+                {/* Errors */}
+                {fileError && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {fileError}
+                  </Alert>
+                )}
+
+                {/* Loading State */}
+                {historyLoading ? (
+                  <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <LinearProgress
+                      sx={{ mb: 2, borderRadius: 1, maxWidth: 400, mx: 'auto' }}
+                    />
+                    <Typography color="text.secondary">
+                      Loading certificate history...
+                    </Typography>
+                  </Box>
+                ) : (
+                  <>
+                    {/* Results Summary */}
+                    <Box
+                      sx={{
+                        mb: 3,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        px: 1,
+                      }}
+                    >
+                      <Typography
+                        variant="h6"
+                        color="primary"
+                        sx={{ fontWeight: 600 }}
+                      >
+                        Certificate History
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Showing <strong>{filteredHistory.length}</strong> of{' '}
+                        <strong>{certificateHistory.length}</strong>{' '}
+                        certificates
+                      </Typography>
+                    </Box>
+
+                    {/* Certificate Cards Grid */}
+                    {filteredHistory.length > 0 ? (
+                      <Grid container spacing={3} justifyContent="center">
+                        {filteredHistory.map((certificate, index) => (
+                          <Grid
+                            item
+                            xs={12}
+                            sm={6}
+                            md={4}
+                            key={certificate._id || index}
+                          >
+                            <Card
+                              elevation={0}
+                              sx={{
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                transition: 'all 0.2s ease',
+                                border: '1px solid',
+                                borderColor: 'grey.200',
+                                backgroundColor: 'white',
+                                borderRadius: 2,
+                                '&:hover': {
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: 3,
+                                  borderColor: 'primary.light',
+                                },
+                              }}
+                            >
+                              <CardContent sx={{ flexGrow: 1, p: 2.5 }}>
+                                {/* Certificate Header */}
+                                <Stack
+                                  direction="row"
+                                  spacing={1.5}
+                                  alignItems="center"
+                                  sx={{ mb: 2 }}
+                                >
+                                  <Avatar
+                                    sx={{
+                                      bgcolor: 'primary.50',
+                                      color: 'primary.main',
+                                      width: 40,
+                                      height: 40,
+                                      border: '1px solid',
+                                      borderColor: 'primary.100',
+                                    }}
+                                  >
+                                    <DescriptionIcon />
+                                  </Avatar>
+                                  <Box sx={{ flexGrow: 1 }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      color="primary"
+                                      sx={{ fontWeight: 600 }}
+                                    >
+                                      {truncateText(certificate.degree, 30)}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ fontFamily: 'monospace' }}
+                                    >
+                                      ID: {truncateText(certificate.certId, 12)}
+                                    </Typography>
+                                  </Box>
+                                  <Chip
+                                    label={certificate.session}
+                                    size="small"
+                                    color="default"
+                                    variant="outlined"
+                                    sx={{
+                                      borderColor: 'grey.300',
+                                      color: 'grey.700',
+                                      fontWeight: 500,
+                                    }}
+                                  />
+                                </Stack>
+
+                                <Divider
+                                  sx={{ my: 1.5, borderColor: 'grey.200' }}
+                                />
+
+                                {/* Student Information */}
+                                <Stack spacing={1.5} sx={{ mb: 2 }}>
+                                  <Box
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                    }}
+                                  >
+                                    <PersonIcon
+                                      sx={{
+                                        mr: 1.5,
+                                        color: 'grey.600',
+                                        fontSize: 20,
+                                      }}
+                                    />
+                                    <Box>
+                                      <Typography
+                                        variant="subtitle1"
+                                        sx={{
+                                          fontWeight: 600,
+                                          color: 'grey.800',
+                                        }}
+                                      >
+                                        {certificate.name}
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mt: 0.5 }}
+                                      >
+                                        Student ID:{' '}
+                                        <strong>{certificate.studentId}</strong>
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+
+                                  <Box
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                    }}
+                                  >
+                                    <SchoolIcon
+                                      sx={{
+                                        mr: 1.5,
+                                        color: 'grey.600',
+                                        fontSize: 20,
+                                      }}
+                                    />
+                                    <Box>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{ color: 'grey.700' }}
+                                      >
+                                        <strong>Department:</strong>{' '}
+                                        {certificate.department}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+
+                                  {certificate.cgpa && (
+                                    <Box
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      <BadgeIcon
+                                        sx={{
+                                          mr: 1.5,
+                                          color: 'grey.600',
+                                          fontSize: 20,
+                                        }}
+                                      />
+                                      <Typography
+                                        variant="body2"
+                                        sx={{ color: 'grey.700' }}
+                                      >
+                                        <strong>CGPA:</strong>{' '}
+                                        {certificate.cgpa}
+                                      </Typography>
+                                    </Box>
+                                  )}
+
+                                  <Box
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                    }}
+                                  >
+                                    <CalendarTodayIcon
+                                      sx={{
+                                        mr: 1.5,
+                                        color: 'grey.500',
+                                        fontSize: 20,
+                                      }}
+                                    />
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      Issued:{' '}
+                                      {formatDate(certificate.createdAt)}
+                                    </Typography>
+                                  </Box>
+                                </Stack>
+                              </CardContent>
+
+                              <Divider sx={{ borderColor: 'grey.200' }} />
+
+                              {/* Action Buttons */}
+                              <CardActions sx={{ p: 2, pt: 1.5 }}>
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  sx={{ width: '100%' }}
+                                >
+                                  <Tooltip
+                                    title={
+                                      copiedCertId === certificate.certId
+                                        ? 'Copied!'
+                                        : 'Copy Certificate ID'
+                                    }
+                                  >
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      startIcon={
+                                        copiedCertId === certificate.certId ? (
+                                          <CheckCircleIcon />
+                                        ) : (
+                                          <ContentCopyIcon />
+                                        )
+                                      }
+                                      onClick={() =>
+                                        copyCertificateId(certificate.certId)
+                                      }
+                                      fullWidth
+                                      sx={{
+                                        borderColor: 'grey.300',
+                                        color: 'grey.700',
+                                        backgroundColor: 'white',
+                                        '&:hover': {
+                                          borderColor: 'primary.main',
+                                          backgroundColor: 'primary.50',
+                                        },
+                                      }}
+                                    >
+                                      {copiedCertId === certificate.certId
+                                        ? 'Copied'
+                                        : 'Copy ID'}
+                                    </Button>
+                                  </Tooltip>
+
+                                  <Tooltip title="Open Certificate">
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      startIcon={<LaunchIcon />}
+                                      onClick={() =>
+                                        openCertificate(certificate.certId)
+                                      }
+                                      fullWidth
+                                      sx={{
+                                        backgroundColor: 'primary.main',
+                                        color: 'white',
+                                        '&:hover': {
+                                          backgroundColor: 'primary.dark',
+                                        },
+                                      }}
+                                    >
+                                      Open
+                                    </Button>
+                                  </Tooltip>
+                                </Stack>
+                              </CardActions>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    ) : (
+                      <Paper
+                        sx={{
+                          p: 6,
+                          textAlign: 'center',
+                          borderRadius: 2,
+                          backgroundColor: 'grey.50',
+                          border: '1px dashed',
+                          borderColor: 'grey.300',
+                          maxWidth: 600,
+                          mx: 'auto',
+                        }}
+                      >
+                        <DescriptionIcon
+                          sx={{ fontSize: 64, color: 'grey.400', mb: 2 }}
+                        />
+                        <Typography
+                          variant="h6"
+                          color="text.secondary"
+                          gutterBottom
+                          sx={{ fontWeight: 500 }}
+                        >
+                          No certificates found
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          paragraph
+                          sx={{ maxWidth: 400, mx: 'auto', mb: 3 }}
+                        >
+                          {appliedSearch.term
+                            ? 'No certificates match your search criteria. Try adjusting your search terms.'
+                            : "You haven't generated any certificates yet. Generate your first certificate to see it here."}
+                        </Typography>
+                        {!appliedSearch.term && (
+                          <Button
+                            variant="contained"
+                            onClick={() => setTabValue(0)}
+                            startIcon={<DescriptionIcon />}
+                            sx={{
+                              backgroundColor: 'primary.main',
+                              '&:hover': {
+                                backgroundColor: 'primary.dark',
+                              },
+                            }}
+                          >
+                            Generate First Certificate
+                          </Button>
+                        )}
+                      </Paper>
+                    )}
+                  </>
+                )}
+              </Box>
+            )}
+          </Paper>
+        </Grid>
       </Grid>
-    </Grid>
+    </Container>
   );
 };
 
